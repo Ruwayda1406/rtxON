@@ -10,35 +10,10 @@ struct RTAccelerationStructure {
     VkDeviceAddress                         handle;
 };
 
-struct RTMesh {
-    uint32_t                    numVertices;
-    uint32_t                    numFaces;
-
-    vulkanhelpers::Buffer       positions;
-    vulkanhelpers::Buffer       attribs;
-    vulkanhelpers::Buffer       indices;
-    vulkanhelpers::Buffer       faces;
-    vulkanhelpers::Buffer       matIDs;
-
-    RTAccelerationStructure     blas;
-};
-
-struct RTMaterial {
-    vulkanhelpers::Image        texture;
-};
-
 struct RTScene {
-    Array<RTMesh>                   meshes;
-    Array<RTMaterial>               materials;
-    RTAccelerationStructure         topLevelAS;
-
-    // shader resources stuff
-    Array<VkDescriptorBufferInfo>   matIDsBufferInfos;
-    Array<VkDescriptorBufferInfo>   attribsBufferInfos;
-    Array<VkDescriptorBufferInfo>   facesBufferInfos;
-    Array<VkDescriptorImageInfo>    texturesInfos;
+	Array<RTAccelerationStructure>  bottomLevelAS;
+	RTAccelerationStructure         topLevelAS;
 };
-
 
 class SBTHelper {
 public:
@@ -91,45 +66,28 @@ protected:
     virtual void InitApp() override;
     virtual void FreeResources() override;
     virtual void FillCommandBuffer(VkCommandBuffer commandBuffer, const size_t imageIndex) override;
-
-    virtual void OnMouseMove(const float x, const float y) override;
-    virtual void OnMouseButton(const int button, const int action, const int mods) override;
-    virtual void OnKey(const int key, const int scancode, const int action, const int mods) override;
-    virtual void Update(const size_t imageIndex, const float dt) override;
-
+	void Update(const size_t, const float dt);
 private:
     bool CreateAS(const VkAccelerationStructureTypeKHR type,
                   const uint32_t geometryCount,
                   const VkAccelerationStructureCreateGeometryTypeInfoKHR* geometries,
                   const uint32_t instanceCount,
                   RTAccelerationStructure& _as);
-    void LoadSceneGeometry();
+	void LoadSceneGeometry();
     void CreateScene();
-    void CreateCamera();
     void UpdateCameraParams(struct UniformParams* params, const float dt);
     void CreateDescriptorSetsLayouts();
     void CreateRaytracingPipelineAndSBT();
     void UpdateDescriptorSets();
 
 private:
-    Array<VkDescriptorSetLayout>    mRTDescriptorSetsLayouts;
-    VkPipelineLayout                mRTPipelineLayout;
     VkPipeline                      mRTPipeline;
+	VkPipelineLayout                mRTPipelineLayout;
+
     VkDescriptorPool                mRTDescriptorPool;
-    Array<VkDescriptorSet>          mRTDescriptorSets;
+    VkDescriptorSet          mRTDescriptorSet;
+	VkDescriptorSetLayout    mRTDescriptorSetsLayout;
 
     SBTHelper                       mSBT;
-
     RTScene                         mScene;
-
-    // camera a& user input
-    Camera                          mCamera;
-    vulkanhelpers::Buffer           mCameraBuffer;
-    bool                            mWKeyDown;
-    bool                            mAKeyDown;
-    bool                            mSKeyDown;
-    bool                            mDKeyDown;
-    bool                            mShiftDown;
-    bool                            mLMBDown;
-    vec2                            mCursorPos;
 };

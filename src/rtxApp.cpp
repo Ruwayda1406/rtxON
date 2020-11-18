@@ -2,19 +2,18 @@
 
 #include "shared_with_shaders.h"
 
-#define TINYOBJLOADER_IMPLEMENTATION
-#include "tiny_obj_loader.h"
-
-
 static const String sShadersFolder = "_data/shaders/";
-static const String sScenesFolder = "_data/scenes/";
 
-static const float sMoveSpeed = 2.0f;
-static const float sAccelMult = 5.0f;
-static const float sRotateSpeed = 0.25f;
 
-static const vec3 sSunPos = vec3(0.4f, 0.45f, 0.55f);
-static const float sAmbientLight = 0.1f;
+struct VkGeometryInstance {
+	float transform[12];
+	uint32_t instanceId : 24;
+	uint32_t mask : 8;
+	uint32_t instanceOffset : 24;
+	uint32_t flags : 8;
+	uint64_t accelerationStructureHandle;
+};
+
 
 
 
@@ -23,12 +22,6 @@ RtxApp::RtxApp()
     , mRTPipelineLayout(VK_NULL_HANDLE)
     , mRTPipeline(VK_NULL_HANDLE)
     , mRTDescriptorPool(VK_NULL_HANDLE)
-    , mWKeyDown(false)
-    , mAKeyDown(false)
-    , mSKeyDown(false)
-    , mDKeyDown(false)
-    , mShiftDown(false)
-    , mLMBDown(false)
 {
 }
 RtxApp::~RtxApp() {
@@ -45,30 +38,31 @@ void RtxApp::InitSettings() {
 }
 
 void RtxApp::InitApp() {
-    this->LoadSceneGeometry();
     this->CreateScene();
-    this->CreateCamera();
     this->CreateDescriptorSetsLayouts();
     this->CreateRaytracingPipelineAndSBT();
     this->UpdateDescriptorSets();
 }
 
 void RtxApp::FreeResources() {
-    for (RTMesh& mesh : mScene.meshes) {
-        vkDestroyAccelerationStructureKHR(mDevice, mesh.blas.accelerationStructure, nullptr);
-        vkFreeMemory(mDevice, mesh.blas.memory, nullptr);
-    }
-    mScene.meshes.clear();
-    mScene.materials.clear();
+	for (RTAccelerationStructure& as : mScene.bottomLevelAS) {
+		if (as.accelerationStructure) {
+			vkDestroyAccelerationStructureKHR(mDevice, as.accelerationStructure, nullptr);
+		}
+		if (as.memory) {
+			vkFreeMemory(mDevice, as.memory, nullptr);
+		}
+	}
+	mScene.bottomLevelAS.clear();
 
-    if (mScene.topLevelAS.accelerationStructure) {
-        vkDestroyAccelerationStructureKHR(mDevice, mScene.topLevelAS.accelerationStructure, nullptr);
-        mScene.topLevelAS.accelerationStructure = VK_NULL_HANDLE;
-    }
-    if (mScene.topLevelAS.memory) {
-        vkFreeMemory(mDevice, mScene.topLevelAS.memory, nullptr);
-        mScene.topLevelAS.memory = VK_NULL_HANDLE;
-    }
+	if (mScene.topLevelAS.accelerationStructure) {
+		vkDestroyAccelerationStructureKHR(mDevice, mScene.topLevelAS.accelerationStructure, nullptr);
+		mScene.topLevelAS.accelerationStructure = VK_NULL_HANDLE;
+	}
+	if (mScene.topLevelAS.memory) {
+		vkFreeMemory(mDevice, mScene.topLevelAS.memory, nullptr);
+		mScene.topLevelAS.memory = VK_NULL_HANDLE;
+	}
 
     if (mRTDescriptorPool) {
         vkDestroyDescriptorPool(mDevice, mRTDescriptorPool, nullptr);
@@ -87,10 +81,8 @@ void RtxApp::FreeResources() {
         mRTPipelineLayout = VK_NULL_HANDLE;
     }
 
-    for (VkDescriptorSetLayout& dsl : mRTDescriptorSetsLayouts) {
-        vkDestroyDescriptorSetLayout(mDevice, dsl, nullptr);
-    }
-    mRTDescriptorSetsLayouts.clear();
+    vkDestroyDescriptorSetLayout(mDevice, mRTDescriptorSetsLayout, nullptr);
+   
 }
 
 void RtxApp::FillCommandBuffer(VkCommandBuffer commandBuffer, const size_t imageIndex) {
@@ -101,7 +93,7 @@ void RtxApp::FillCommandBuffer(VkCommandBuffer commandBuffer, const size_t image
     vkCmdBindDescriptorSets(commandBuffer,
                             VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
                             mRTPipelineLayout, 0,
-                            static_cast<uint32_t>(mRTDescriptorSets.size()), mRTDescriptorSets.data(),
+                            1 , &mRTDescriptorSet,
                             0, 0);
 
     VkStridedBufferRegionKHR raygenSBT = {
@@ -130,52 +122,6 @@ void RtxApp::FillCommandBuffer(VkCommandBuffer commandBuffer, const size_t image
     vkCmdTraceRaysKHR(commandBuffer, &raygenSBT, &missSBT, &hitSBT, &callableSBT, mSettings.resolutionX, mSettings.resolutionY, 1u);
 }
 
-void RtxApp::OnMouseMove(const float x, const float y) {
-    vec2 newPos(x, y);
-    vec2 delta = mCursorPos - newPos;
-
-    if (mLMBDown) {
-        mCamera.Rotate(delta.x * sRotateSpeed, delta.y * sRotateSpeed);
-    }
-
-    mCursorPos = newPos;
-}
-
-void RtxApp::OnMouseButton(const int button, const int action, const int mods) {
-    if (0 == button && GLFW_PRESS == action) {
-        mLMBDown = true;
-    } else if (0 == button && GLFW_RELEASE == action) {
-        mLMBDown = false;
-    }
-}
-
-void RtxApp::OnKey(const int key, const int scancode, const int action, const int mods) {
-    if (GLFW_PRESS == action) {
-        switch (key) {
-            case GLFW_KEY_W: mWKeyDown = true; break;
-            case GLFW_KEY_A: mAKeyDown = true; break;
-            case GLFW_KEY_S: mSKeyDown = true; break;
-            case GLFW_KEY_D: mDKeyDown = true; break;
-
-            case GLFW_KEY_LEFT_SHIFT:
-            case GLFW_KEY_RIGHT_SHIFT:
-                mShiftDown = true;
-            break;
-        }
-    } else if (GLFW_RELEASE == action) {
-        switch (key) {
-            case GLFW_KEY_W: mWKeyDown = false; break;
-            case GLFW_KEY_A: mAKeyDown = false; break;
-            case GLFW_KEY_S: mSKeyDown = false; break;
-            case GLFW_KEY_D: mDKeyDown = false; break;
-
-            case GLFW_KEY_LEFT_SHIFT:
-            case GLFW_KEY_RIGHT_SHIFT:
-                mShiftDown = false;
-            break;
-        }
-    }
-}
 
 void RtxApp::Update(const size_t, const float dt) {
     // Update FPS text
@@ -185,13 +131,13 @@ void RtxApp::Update(const size_t, const float dt) {
     /////////////////
 
 
-    UniformParams* params = reinterpret_cast<UniformParams*>(mCameraBuffer.Map());
+  //  UniformParams* params = reinterpret_cast<UniformParams*>(mCameraBuffer.Map());
 
-    params->sunPosAndAmbient = vec4(sSunPos, sAmbientLight);
+ //   params->sunPosAndAmbient = vec4(sSunPos, sAmbientLight);
 
-    this->UpdateCameraParams(params, dt);
+ //   this->UpdateCameraParams(params, dt);
 
-    mCameraBuffer.Unmap();
+  //  mCameraBuffer.Unmap();
 }
 
 
@@ -207,9 +153,11 @@ bool RtxApp::CreateAS(const VkAccelerationStructureTypeKHR type,
     accelerationStructureInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR;
     accelerationStructureInfo.type = type;
     accelerationStructureInfo.flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR;
+	//accelerationStructureInfo.flags = 0;
     accelerationStructureInfo.maxGeometryCount = geometryCount;
     accelerationStructureInfo.pGeometryInfos = geometries;
-
+	accelerationStructureInfo.pNext = nullptr;
+	accelerationStructureInfo.compactedSize = 0;
     VkResult error = vkCreateAccelerationStructureKHR(mDevice, &accelerationStructureInfo, nullptr, &_as.accelerationStructure);
     if (VK_SUCCESS != error) {
         CHECK_VK_ERROR(error, "vkCreateAccelerationStructureKHR");
@@ -260,212 +208,91 @@ bool RtxApp::CreateAS(const VkAccelerationStructureTypeKHR type,
 }
 
 void RtxApp::LoadSceneGeometry() {
-    tinyobj::attrib_t attrib;
-    std::vector<tinyobj::shape_t> shapes;
-    std::vector<tinyobj::material_t> materials;
-    String warn, error;
 
-    String fileName = sScenesFolder + "fake_whitted/fake_whitted.obj";
-    String baseDir = fileName;
-    const size_t slash = baseDir.find_last_of('/');
-    if (slash != String::npos) {
-        baseDir.erase(slash);
-    }
 
-    const bool result = tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &error, fileName.c_str(), baseDir.c_str(), true);
-    if (result) {
-        mScene.meshes.resize(shapes.size());
-        mScene.materials.resize(materials.size());
 
-        for (size_t meshIdx = 0; meshIdx < shapes.size(); ++meshIdx) {
-            RTMesh& mesh = mScene.meshes[meshIdx];
-            const tinyobj::shape_t& shape = shapes[meshIdx];
+	//vec3* p = reinterpret_cast<vec3*>(positions.Map());
+	//uint32_t* i = reinterpret_cast<uint32_t*>(indices.Map());
 
-            const size_t numFaces = shape.mesh.num_face_vertices.size();
-            const size_t numVertices = numFaces * 3;
+	//indices.Unmap();
+	//positions.Unmap();
 
-            mesh.numVertices = static_cast<uint32_t>(numVertices);
-            mesh.numFaces = static_cast<uint32_t>(numFaces);
-
-            const size_t positionsBufferSize = numVertices * sizeof(vec3);
-            const size_t indicesBufferSize = numFaces * 3 * sizeof(uint32_t);
-            const size_t facesBufferSize = numFaces * 4 * sizeof(uint32_t);
-            const size_t attribsBufferSize = numVertices * sizeof(VertexAttribute);
-            const size_t matIDsBufferSize = numFaces * sizeof(uint32_t);
-
-            VkResult error = mesh.positions.Create(positionsBufferSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_RAY_TRACING_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-            CHECK_VK_ERROR(error, "mesh.positions.Create");
-
-            error = mesh.indices.Create(indicesBufferSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_RAY_TRACING_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-            CHECK_VK_ERROR(error, "mesh.indices.Create");
-
-            error = mesh.faces.Create(facesBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_RAY_TRACING_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-            CHECK_VK_ERROR(error, "mesh.faces.Create");
-
-            error = mesh.attribs.Create(attribsBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_RAY_TRACING_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-            CHECK_VK_ERROR(error, "mesh.attribs.Create");
-
-            error = mesh.matIDs.Create(matIDsBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_RAY_TRACING_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-            CHECK_VK_ERROR(error, "mesh.matIDs.Create");
-
-            vec3* positions = reinterpret_cast<vec3*>(mesh.positions.Map());
-            VertexAttribute* attribs = reinterpret_cast<VertexAttribute*>(mesh.attribs.Map());
-            uint32_t* indices = reinterpret_cast<uint32_t*>(mesh.indices.Map());
-            uint32_t* faces = reinterpret_cast<uint32_t*>(mesh.faces.Map());
-            uint32_t* matIDs = reinterpret_cast<uint32_t*>(mesh.matIDs.Map());
-
-            size_t vIdx = 0;
-            for (size_t f = 0; f < numFaces; ++f) {
-                assert(shape.mesh.num_face_vertices[f] == 3);
-                for (size_t j = 0; j < 3; ++j, ++vIdx) {
-                    const tinyobj::index_t& i = shape.mesh.indices[vIdx];
-
-                    vec3& pos = positions[vIdx];
-                    vec4& normal = attribs[vIdx].normal;
-                    vec4& uv = attribs[vIdx].uv;
-
-                    pos.x = attrib.vertices[3 * i.vertex_index + 0];
-                    pos.y = attrib.vertices[3 * i.vertex_index + 1];
-                    pos.z = attrib.vertices[3 * i.vertex_index + 2];
-                    normal.x = attrib.normals[3 * i.normal_index + 0];
-                    normal.y = attrib.normals[3 * i.normal_index + 1];
-                    normal.z = attrib.normals[3 * i.normal_index + 2];
-                    uv.x = attrib.texcoords[2 * i.texcoord_index + 0];
-                    uv.y = attrib.texcoords[2 * i.texcoord_index + 1];
-                }
-
-                const uint32_t a = static_cast<uint32_t>(3 * f + 0);
-                const uint32_t b = static_cast<uint32_t>(3 * f + 1);
-                const uint32_t c = static_cast<uint32_t>(3 * f + 2);
-                indices[a] = a;
-                indices[b] = b;
-                indices[c] = c;
-                faces[4 * f + 0] = a;
-                faces[4 * f + 1] = b;
-                faces[4 * f + 2] = c;
-
-                matIDs[f] = static_cast<uint32_t>(shape.mesh.material_ids[f]);
-            }
-
-            mesh.matIDs.Unmap();
-            mesh.indices.Unmap();
-            mesh.faces.Unmap();
-            mesh.attribs.Unmap();
-            mesh.positions.Unmap();
-        }
-
-        VkImageSubresourceRange subresourceRange = {};
-        subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        subresourceRange.baseMipLevel = 0;
-        subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
-        subresourceRange.baseArrayLayer = 0;
-        subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
-
-        for (size_t i = 0; i < materials.size(); ++i) {
-            const tinyobj::material_t& srcMat = materials[i];
-            RTMaterial& dstMat = mScene.materials[i];
-
-            String fullTexturePath = baseDir + "/" + srcMat.diffuse_texname;
-            if (dstMat.texture.Load(fullTexturePath.c_str())) {
-                dstMat.texture.CreateImageView(VK_IMAGE_VIEW_TYPE_2D, dstMat.texture.GetFormat(), subresourceRange);
-                dstMat.texture.CreateSampler(VK_FILTER_LINEAR, VK_FILTER_LINEAR, VK_SAMPLER_MIPMAP_MODE_LINEAR, VK_SAMPLER_ADDRESS_MODE_REPEAT);
-            }
-        }
-    }
-
-    // prepare shader resources infos
-    const size_t numMeshes = mScene.meshes.size();
-    const size_t numMaterials = mScene.materials.size();
-
-    mScene.matIDsBufferInfos.resize(numMeshes);
-    mScene.attribsBufferInfos.resize(numMeshes);
-    mScene.facesBufferInfos.resize(numMeshes);
-    for (size_t i = 0; i < numMeshes; ++i) {
-        const RTMesh& mesh = mScene.meshes[i];
-        VkDescriptorBufferInfo& matIDsInfo = mScene.matIDsBufferInfos[i];
-        VkDescriptorBufferInfo& attribsInfo = mScene.attribsBufferInfos[i];
-        VkDescriptorBufferInfo& facesInfo = mScene.facesBufferInfos[i];
-
-        matIDsInfo.buffer = mesh.matIDs.GetBuffer();
-        matIDsInfo.offset = 0;
-        matIDsInfo.range = mesh.matIDs.GetSize();
-
-        attribsInfo.buffer = mesh.attribs.GetBuffer();
-        attribsInfo.offset = 0;
-        attribsInfo.range = mesh.attribs.GetSize();
-
-        facesInfo.buffer = mesh.faces.GetBuffer();
-        facesInfo.offset = 0;
-        facesInfo.range = mesh.faces.GetSize();
-    }
-
-    mScene.texturesInfos.resize(numMaterials);
-    for (size_t i = 0; i < numMaterials; ++i) {
-        const RTMaterial& mat = mScene.materials[i];
-        VkDescriptorImageInfo& textureInfo = mScene.texturesInfos[i];
-
-        textureInfo.sampler = mat.texture.GetSampler();
-        textureInfo.imageView = mat.texture.GetImageView();
-        textureInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    }
 }
-
 void RtxApp::CreateScene() {
+
+	vulkanhelpers::Buffer pb, ib;
+	const float vertices[9] = {
+		0.25f, 0.25f, 0.0f,
+		0.75f, 0.25f, 0.0f,
+		0.50f, 0.75f, 0.0f
+	};
+
+	const uint32_t indices[3] = { 0, 1, 2 };
+
+	VkResult error = pb.Create(sizeof(vertices), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_RAY_TRACING_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+	CHECK_VK_ERROR(error, "mesh.positions.Create");
+
+	if (!pb.UploadData(&vertices, pb.GetSize())) {
+		assert(false && "Failed to upload vertices buffer");
+	}
+	error = ib.Create(sizeof(indices), VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_RAY_TRACING_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+	CHECK_VK_ERROR(error, "mesh.indices.Create");
+
+	if (!ib.UploadData(&indices, ib.GetSize())) {
+		assert(false && "Failed to upload indices buffer");
+	}
     const VkTransformMatrixKHR transform = {
         1.0f, 0.0f, 0.0f, 0.0f,
         0.0f, 1.0f, 0.0f, 0.0f,
         0.0f, 0.0f, 1.0f, 0.0f,
     };
 
-    const size_t numMeshes = mScene.meshes.size();
+	VkAccelerationStructureCreateGeometryTypeInfoKHR geometryInfo{};
+	VkAccelerationStructureGeometryKHR geometry{};
 
-    Array<VkAccelerationStructureCreateGeometryTypeInfoKHR> geometryInfos(numMeshes, VkAccelerationStructureCreateGeometryTypeInfoKHR{});
-    Array<VkAccelerationStructureGeometryKHR> geometries(numMeshes, VkAccelerationStructureGeometryKHR{});
-    Array<VkAccelerationStructureInstanceKHR> instances(numMeshes, VkAccelerationStructureInstanceKHR{});
+    geometryInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_GEOMETRY_TYPE_INFO_KHR;
+    geometryInfo.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
+    geometryInfo.maxPrimitiveCount = 1;
+    geometryInfo.maxVertexCount = 3;
+	geometryInfo.indexType = VK_INDEX_TYPE_UINT32;
+    geometryInfo.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
+    geometryInfo.allowsTransforms = VK_FALSE;
 
-    for (size_t i = 0; i < numMeshes; ++i) {
-        RTMesh& mesh = mScene.meshes[i];
+	VkAccelerationStructureGeometryTrianglesDataKHR triangles;
+	triangles.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR;
+	triangles.vertexData = vulkanhelpers::GetBufferDeviceAddressConst(pb);
+	triangles.indexData = vulkanhelpers::GetBufferDeviceAddressConst(ib);
+	triangles.vertexStride = sizeof(vec3);
+	triangles.vertexFormat = geometryInfo.vertexFormat;
+    triangles.indexType = geometryInfo.indexType;
 
-        VkAccelerationStructureCreateGeometryTypeInfoKHR& geometryInfo = geometryInfos[i];
-        VkAccelerationStructureGeometryKHR& geometry = geometries[i];
-
-        geometryInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_GEOMETRY_TYPE_INFO_KHR;
-        geometryInfo.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
-        geometryInfo.maxPrimitiveCount = mesh.numFaces;
-        geometryInfo.indexType = VK_INDEX_TYPE_UINT32;
-        geometryInfo.maxVertexCount = mesh.numVertices;
-        geometryInfo.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
-        geometryInfo.allowsTransforms = VK_FALSE;
-
-        geometry.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
-        geometry.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
-        geometry.geometryType = geometryInfo.geometryType;
-        geometry.geometry.triangles.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR;
-        geometry.geometry.triangles.vertexData = vulkanhelpers::GetBufferDeviceAddressConst(mesh.positions);
-        geometry.geometry.triangles.vertexStride = sizeof(vec3);
-        geometry.geometry.triangles.vertexFormat = geometryInfo.vertexFormat;
-        geometry.geometry.triangles.indexData = vulkanhelpers::GetBufferDeviceAddressConst(mesh.indices);
-        geometry.geometry.triangles.indexType = geometryInfo.indexType;
-
-        // here we create our bottom-level acceleration structure for our mesh
-        this->CreateAS(VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR, 1, &geometryInfo, 0, mesh.blas);
+    geometry.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
+    geometry.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
+    geometry.geometryType = geometryInfo.geometryType;
+	geometry.geometry.triangles = triangles;
 
 
-        VkAccelerationStructureInstanceKHR& instance = instances[i];
-        instance.transform = transform;
-        instance.instanceCustomIndex = static_cast<uint32_t>(i);
-        instance.mask = 0xff;
-        instance.instanceShaderBindingTableRecordOffset = 0;
-        instance.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
-        instance.accelerationStructureReference = mesh.blas.handle;
-    }
+    // here we create our bottom-level acceleration structure for our mesh
+    this->CreateAS(VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR, 1, &geometryInfo, 0, mScene.bottomLevelAS[0]);
+
+
+	VkAccelerationStructureInstanceKHR instance{};
+    instance.transform = transform;
+	instance.instanceCustomIndex = 0;// static_cast<uint32_t>(i);
+	//instance.instanceId = 0;
+	//instance.instanceOffset = 0;
+    instance.mask = 0xff;
+    instance.instanceShaderBindingTableRecordOffset = 0;
+    instance.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
+    instance.accelerationStructureReference = mScene.bottomLevelAS[0].handle;
+    
 
     // create instances for our meshes
     vulkanhelpers::Buffer instancesBuffer;
-    VkResult error = instancesBuffer.Create(instances.size() * sizeof(VkAccelerationStructureInstanceKHR), VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_RAY_TRACING_BIT_KHR, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+     error = instancesBuffer.Create(sizeof(VkAccelerationStructureInstanceKHR), VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_RAY_TRACING_BIT_KHR, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
     CHECK_VK_ERROR(error, "instancesBuffer.Create");
 
-    if (!instancesBuffer.UploadData(instances.data(), instancesBuffer.GetSize())) {
+    if (!instancesBuffer.UploadData(&instance, instancesBuffer.GetSize())) {
         assert(false && "Failed to upload instances buffer");
     }
 
@@ -474,7 +301,7 @@ void RtxApp::CreateScene() {
     VkAccelerationStructureCreateGeometryTypeInfoKHR tlasGeoInfo = {};
     tlasGeoInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_GEOMETRY_TYPE_INFO_KHR;
     tlasGeoInfo.geometryType = VK_GEOMETRY_TYPE_INSTANCES_KHR;
-    tlasGeoInfo.maxPrimitiveCount = static_cast<uint32_t>(instances.size());
+	tlasGeoInfo.maxPrimitiveCount = 1;// static_cast<uint32_t>(instances.size());
     tlasGeoInfo.allowsTransforms = VK_TRUE;
 
     this->CreateAS(VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR, 1, &tlasGeoInfo, 1, mScene.topLevelAS);
@@ -486,16 +313,15 @@ void RtxApp::CreateScene() {
     memoryRequirementsInfo.buildType = VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR;
 
     VkDeviceSize maximumBlasSize = 0;
-    for (const RTMesh& mesh : mScene.meshes) {
-        memoryRequirementsInfo.type = VK_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_TYPE_BUILD_SCRATCH_KHR;
-        memoryRequirementsInfo.accelerationStructure = mesh.blas.accelerationStructure;
+    memoryRequirementsInfo.type = VK_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_TYPE_BUILD_SCRATCH_KHR;
+    memoryRequirementsInfo.accelerationStructure = mScene.bottomLevelAS[0].accelerationStructure;
 
-        VkMemoryRequirements2 memReqBLAS = {};
-        memReqBLAS.sType = VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2;
-        vkGetAccelerationStructureMemoryRequirementsKHR(mDevice, &memoryRequirementsInfo, &memReqBLAS);
+    VkMemoryRequirements2 memReqBLAS = {};
+    memReqBLAS.sType = VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2;
+    vkGetAccelerationStructureMemoryRequirementsKHR(mDevice, &memoryRequirementsInfo, &memReqBLAS);
 
-        maximumBlasSize = Max(maximumBlasSize, memReqBLAS.memoryRequirements.size);
-    }
+    maximumBlasSize = Max(maximumBlasSize, memReqBLAS.memoryRequirements.size);
+    
 
     VkMemoryRequirements2 memReqTLAS = {};
     memReqTLAS.sType = VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2;
@@ -530,23 +356,23 @@ void RtxApp::CreateScene() {
     memoryBarrier.dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR;
 
     // build bottom-level ASs
-    for (size_t i = 0; i < numMeshes; ++i) {
-        VkAccelerationStructureGeometryKHR* geometryPtr = &geometries[i];
+    {
+        VkAccelerationStructureGeometryKHR* geometryPtr = &geometry;
 
         VkAccelerationStructureBuildGeometryInfoKHR buildInfo = {};
         buildInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR;
-        buildInfo.type = mScene.meshes[i].blas.accelerationStructureInfo.type;
-        buildInfo.flags = mScene.meshes[i].blas.accelerationStructureInfo.flags;
+        buildInfo.type = mScene.bottomLevelAS[0].accelerationStructureInfo.type;
+        buildInfo.flags = mScene.bottomLevelAS[0].accelerationStructureInfo.flags;
         buildInfo.update = VK_FALSE;
         buildInfo.srcAccelerationStructure = VK_NULL_HANDLE;
-        buildInfo.dstAccelerationStructure = mScene.meshes[i].blas.accelerationStructure;
+        buildInfo.dstAccelerationStructure = mScene.bottomLevelAS[0].accelerationStructure;
         buildInfo.geometryArrayOfPointers = VK_FALSE;
-        buildInfo.geometryCount = mScene.meshes[i].blas.accelerationStructureInfo.maxGeometryCount;
+        buildInfo.geometryCount = mScene.bottomLevelAS[0].accelerationStructureInfo.maxGeometryCount;
         buildInfo.ppGeometries = &geometryPtr;
         buildInfo.scratchData = vulkanhelpers::GetBufferDeviceAddress(scratchBuffer);
 
         VkAccelerationStructureBuildOffsetInfoKHR offsetInfo;
-        offsetInfo.primitiveCount = geometryInfos[i].maxPrimitiveCount;
+        offsetInfo.primitiveCount = geometryInfo.maxPrimitiveCount;
         offsetInfo.primitiveOffset = 0;
         offsetInfo.firstVertex = 0;
         offsetInfo.transformOffset = 0;
@@ -612,152 +438,48 @@ void RtxApp::CreateScene() {
     vkFreeCommandBuffers(mDevice, mCommandPool, 1, &commandBuffer);
 }
 
-void RtxApp::CreateCamera() {
-    VkResult error = mCameraBuffer.Create(sizeof(UniformParams), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_RAY_TRACING_BIT_KHR, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-    CHECK_VK_ERROR(error, "mCameraBuffer.Create");
-
-    mCamera.SetViewport({ 0, 0, static_cast<int>(mSettings.resolutionX), static_cast<int>(mSettings.resolutionY) });
-    mCamera.SetViewPlanes(0.1f, 100.0f);
-    mCamera.SetFovY(45.0f);
-    mCamera.LookAt(vec3(0.25f, 3.20f, 6.15f), vec3(0.25f, 2.75f, 5.25f));
-}
-
-void RtxApp::UpdateCameraParams(UniformParams* params, const float dt) {
-    vec2 moveDelta(0.0f, 0.0f);
-    if (mWKeyDown) {
-        moveDelta.y += 1.0f;
-    }
-    if (mSKeyDown) {
-        moveDelta.y -= 1.0f;
-    }
-    if (mAKeyDown) {
-        moveDelta.x -= 1.0f;
-    }
-    if (mDKeyDown) {
-        moveDelta.x += 1.0f;
-    }
-
-    moveDelta *= sMoveSpeed * dt * (mShiftDown ? sAccelMult : 1.0f);
-    mCamera.Move(moveDelta.x, moveDelta.y);
-
-    params->camPos = vec4(mCamera.GetPosition(), 0.0f);
-    params->camDir = vec4(mCamera.GetDirection(), 0.0f);
-    params->camUp = vec4(mCamera.GetUp(), 0.0f);
-    params->camSide = vec4(mCamera.GetSide(), 0.0f);
-    params->camNearFarFov = vec4(mCamera.GetNearPlane(), mCamera.GetFarPlane(), Deg2Rad(mCamera.GetFovY()), 0.0f);
-}
-
 void RtxApp::CreateDescriptorSetsLayouts() {
-    const uint32_t numMeshes = static_cast<uint32_t>(mScene.meshes.size());
-    const uint32_t numMaterials = static_cast<uint32_t>(mScene.materials.size());
-
-    mRTDescriptorSetsLayouts.resize(SWS_NUM_SETS);
-
     // First set:
     //  binding 0  ->  AS
     //  binding 1  ->  output image
-    //  binding 2  ->  Camera data
 
     VkDescriptorSetLayoutBinding accelerationStructureLayoutBinding;
-    accelerationStructureLayoutBinding.binding = SWS_SCENE_AS_BINDING;
+	accelerationStructureLayoutBinding.binding = 0;// SWS_SCENE_AS_BINDING;
     accelerationStructureLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
     accelerationStructureLayoutBinding.descriptorCount = 1;
     accelerationStructureLayoutBinding.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
     accelerationStructureLayoutBinding.pImmutableSamplers = nullptr;
 
     VkDescriptorSetLayoutBinding resultImageLayoutBinding;
-    resultImageLayoutBinding.binding = SWS_RESULT_IMAGE_BINDING;
+	resultImageLayoutBinding.binding = 1;// SWS_RESULT_IMAGE_BINDING;
     resultImageLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
     resultImageLayoutBinding.descriptorCount = 1;
     resultImageLayoutBinding.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
     resultImageLayoutBinding.pImmutableSamplers = nullptr;
 
-    VkDescriptorSetLayoutBinding camdataBufferBinding;
-    camdataBufferBinding.binding = SWS_CAMDATA_BINDING;
-    camdataBufferBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    camdataBufferBinding.descriptorCount = 1;
-    camdataBufferBinding.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
-    camdataBufferBinding.pImmutableSamplers = nullptr;
+
 
     std::vector<VkDescriptorSetLayoutBinding> bindings({
         accelerationStructureLayoutBinding,
         resultImageLayoutBinding,
-        camdataBufferBinding
     });
 
-    VkDescriptorSetLayoutCreateInfo set0LayoutInfo;
-    set0LayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    set0LayoutInfo.pNext = nullptr;
-    set0LayoutInfo.flags = 0;
-    set0LayoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
-    set0LayoutInfo.pBindings = bindings.data();
+    VkDescriptorSetLayoutCreateInfo layoutInfo;
+	layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+	layoutInfo.pNext = nullptr;
+	layoutInfo.flags = 0;
+	layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+	layoutInfo.pBindings = bindings.data();
 
-    VkResult error = vkCreateDescriptorSetLayout(mDevice, &set0LayoutInfo, nullptr, &mRTDescriptorSetsLayouts[SWS_SCENE_AS_SET]);
+    VkResult error = vkCreateDescriptorSetLayout(mDevice, &layoutInfo, nullptr, &mRTDescriptorSetsLayout);
     CHECK_VK_ERROR(error, "vkCreateDescriptorSetLayout");
-
-    // Second set:
-    //  binding 0 .. N  ->  per-face material IDs for our meshes  (N = num meshes)
-
-    const VkDescriptorBindingFlags flag = VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT;
-
-    VkDescriptorSetLayoutBindingFlagsCreateInfo bindingFlags;
-    bindingFlags.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO;
-    bindingFlags.pNext = nullptr;
-    bindingFlags.pBindingFlags = &flag;
-    bindingFlags.bindingCount = 1;
-
-    VkDescriptorSetLayoutBinding ssboBinding;
-    ssboBinding.binding = 0;
-    ssboBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    ssboBinding.descriptorCount = numMeshes;
-    ssboBinding.stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
-    ssboBinding.pImmutableSamplers = nullptr;
-
-    VkDescriptorSetLayoutCreateInfo set1LayoutInfo;
-    set1LayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    set1LayoutInfo.pNext = &bindingFlags;
-    set1LayoutInfo.flags = 0;
-    set1LayoutInfo.bindingCount = 1;
-    set1LayoutInfo.pBindings = &ssboBinding;
-
-    error = vkCreateDescriptorSetLayout(mDevice, &set1LayoutInfo, nullptr, &mRTDescriptorSetsLayouts[SWS_MATIDS_SET]);
-    CHECK_VK_ERROR(error, L"vkCreateDescriptorSetLayout");
-
-    // Third set:
-    //  binding 0 .. N  ->  vertex attributes for our meshes  (N = num meshes)
-    //   (re-using second's set info)
-
-    error = vkCreateDescriptorSetLayout(mDevice, &set1LayoutInfo, nullptr, &mRTDescriptorSetsLayouts[SWS_ATTRIBS_SET]);
-    CHECK_VK_ERROR(error, L"vkCreateDescriptorSetLayout");
-
-    // Fourth set:
-    //  binding 0 .. N  ->  faces info (indices) for our meshes  (N = num meshes)
-    //   (re-using second's set info)
-
-    error = vkCreateDescriptorSetLayout(mDevice, &set1LayoutInfo, nullptr, &mRTDescriptorSetsLayouts[SWS_FACES_SET]);
-    CHECK_VK_ERROR(error, L"vkCreateDescriptorSetLayout");
-
-    // Fifth set:
-    //  binding 0 .. N  ->  textures (N = num materials)
-    
-    VkDescriptorSetLayoutBinding textureBinding;
-    textureBinding.binding = 0;
-    textureBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    textureBinding.descriptorCount = numMaterials;
-    textureBinding.stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
-    textureBinding.pImmutableSamplers = nullptr;
-
-    set1LayoutInfo.pBindings = &textureBinding;
-
-    error = vkCreateDescriptorSetLayout(mDevice, &set1LayoutInfo, nullptr, &mRTDescriptorSetsLayouts[SWS_TEXTURES_SET]);
-    CHECK_VK_ERROR(error, L"vkCreateDescriptorSetLayout");
 }
 
 void RtxApp::CreateRaytracingPipelineAndSBT() {
     VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {};
     pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipelineLayoutCreateInfo.setLayoutCount = SWS_NUM_SETS;
-    pipelineLayoutCreateInfo.pSetLayouts = mRTDescriptorSetsLayouts.data();
+	pipelineLayoutCreateInfo.setLayoutCount = 1;// SWS_NUM_SETS;
+    pipelineLayoutCreateInfo.pSetLayouts =&mRTDescriptorSetsLayout;
 
     VkResult error = vkCreatePipelineLayout(mDevice, &pipelineLayoutCreateInfo, nullptr, &mRTPipelineLayout);
     CHECK_VK_ERROR(error, "vkCreatePipelineLayout");
@@ -767,20 +489,22 @@ void RtxApp::CreateRaytracingPipelineAndSBT() {
     rayGenShader.LoadFromFile((sShadersFolder + "ray_gen.bin").c_str());
     rayChitShader.LoadFromFile((sShadersFolder + "ray_chit.bin").c_str());
     rayMissShader.LoadFromFile((sShadersFolder + "ray_miss.bin").c_str());
-    shadowChit.LoadFromFile((sShadersFolder + "shadow_ray_chit.bin").c_str());
-    shadowMiss.LoadFromFile((sShadersFolder + "shadow_ray_miss.bin").c_str());
 
     mSBT.Initialize(2, 2, mRTProps.shaderGroupHandleSize, mRTProps.shaderGroupBaseAlignment);
 
     mSBT.SetRaygenStage(rayGenShader.GetShaderStage(VK_SHADER_STAGE_RAYGEN_BIT_KHR));
 
-    mSBT.AddStageToHitGroup({ rayChitShader.GetShaderStage(VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR) }, SWS_PRIMARY_HIT_SHADERS_IDX);
-    mSBT.AddStageToHitGroup({ shadowChit.GetShaderStage(VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR) }, SWS_SHADOW_HIT_SHADERS_IDX);
+	mSBT.AddStageToHitGroup({ rayChitShader.GetShaderStage(VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR) }, 0);// SWS_PRIMARY_HIT_SHADERS_IDX);
+    //mSBT.AddStageToHitGroup({ shadowChit.GetShaderStage(VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR) }, SWS_SHADOW_HIT_SHADERS_IDX);
 
-    mSBT.AddStageToMissGroup(rayMissShader.GetShaderStage(VK_SHADER_STAGE_MISS_BIT_KHR), SWS_PRIMARY_MISS_SHADERS_IDX);
-    mSBT.AddStageToMissGroup(shadowMiss.GetShaderStage(VK_SHADER_STAGE_MISS_BIT_KHR), SWS_SHADOW_MISS_SHADERS_IDX);
+	mSBT.AddStageToMissGroup(rayMissShader.GetShaderStage(VK_SHADER_STAGE_MISS_BIT_KHR), 0);// SWS_PRIMARY_MISS_SHADERS_IDX);
+    //mSBT.AddStageToMissGroup(shadowMiss.GetShaderStage(VK_SHADER_STAGE_MISS_BIT_KHR), SWS_SHADOW_MISS_SHADERS_IDX);
 
 
+	// here are our groups map:
+	// group 0 : raygen
+	// group 1 : closest hit
+	// group 2 : miss
     VkRayTracingPipelineCreateInfoKHR rayPipelineInfo = {};
     rayPipelineInfo.sType = VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR;
     rayPipelineInfo.stageCount = mSBT.GetNumStages();
@@ -798,56 +522,30 @@ void RtxApp::CreateRaytracingPipelineAndSBT() {
 }
 
 void RtxApp::UpdateDescriptorSets() {
-    const uint32_t numMeshes = static_cast<uint32_t>(mScene.meshes.size());
-    const uint32_t numMaterials = static_cast<uint32_t>(mScene.materials.size());
-
     std::vector<VkDescriptorPoolSize> poolSizes({
         { VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 1 },       // top-level AS
         { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1 },                    // output image
-        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1 },                   // Camera data
-        //
-        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, numMeshes * 3 },       // per-face material IDs for each mesh
-                                                                    // vertex attribs for each mesh
-                                                                    // faces buffer for each mesh
-        //
-        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, numMaterials } // textures for each material
     });
 
     VkDescriptorPoolCreateInfo descriptorPoolCreateInfo;
     descriptorPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     descriptorPoolCreateInfo.pNext = nullptr;
     descriptorPoolCreateInfo.flags = 0;
-    descriptorPoolCreateInfo.maxSets = SWS_NUM_SETS;
+	descriptorPoolCreateInfo.maxSets = 1;// SWS_NUM_SETS;
     descriptorPoolCreateInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
     descriptorPoolCreateInfo.pPoolSizes = poolSizes.data();
 
     VkResult error = vkCreateDescriptorPool(mDevice, &descriptorPoolCreateInfo, nullptr, &mRTDescriptorPool);
     CHECK_VK_ERROR(error, "vkCreateDescriptorPool");
 
-    mRTDescriptorSets.resize(SWS_NUM_SETS);
-
-    Array<uint32_t> variableDescriptorCounts({
-        1,
-        numMeshes,      // per-face material IDs for each mesh
-        numMeshes,      // vertex attribs for each mesh
-        numMeshes,      // faces buffer for each mesh
-        numMaterials,   // textures for each material
-    });
-
-    VkDescriptorSetVariableDescriptorCountAllocateInfo variableDescriptorCountInfo;
-    variableDescriptorCountInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO;
-    variableDescriptorCountInfo.pNext = nullptr;
-    variableDescriptorCountInfo.descriptorSetCount = SWS_NUM_SETS;
-    variableDescriptorCountInfo.pDescriptorCounts = variableDescriptorCounts.data(); // actual number of descriptors
-
     VkDescriptorSetAllocateInfo descriptorSetAllocateInfo;
     descriptorSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    descriptorSetAllocateInfo.pNext = &variableDescriptorCountInfo;
+    descriptorSetAllocateInfo.pNext = nullptr;;
     descriptorSetAllocateInfo.descriptorPool = mRTDescriptorPool;
-    descriptorSetAllocateInfo.descriptorSetCount = SWS_NUM_SETS;
-    descriptorSetAllocateInfo.pSetLayouts = mRTDescriptorSetsLayouts.data();
+	descriptorSetAllocateInfo.descriptorSetCount = 1;// SWS_NUM_SETS;
+    descriptorSetAllocateInfo.pSetLayouts = &mRTDescriptorSetsLayout;
 
-    error = vkAllocateDescriptorSets(mDevice, &descriptorSetAllocateInfo, mRTDescriptorSets.data());
+    error = vkAllocateDescriptorSets(mDevice, &descriptorSetAllocateInfo, &mRTDescriptorSet);
     CHECK_VK_ERROR(error, "vkAllocateDescriptorSets");
 
     ///////////////////////////////////////////////////////////
@@ -861,8 +559,8 @@ void RtxApp::UpdateDescriptorSets() {
     VkWriteDescriptorSet accelerationStructureWrite;
     accelerationStructureWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     accelerationStructureWrite.pNext = &descriptorAccelerationStructureInfo; // Notice that pNext is assigned here!
-    accelerationStructureWrite.dstSet = mRTDescriptorSets[SWS_SCENE_AS_SET];
-    accelerationStructureWrite.dstBinding = SWS_SCENE_AS_BINDING;
+    accelerationStructureWrite.dstSet = mRTDescriptorSet;
+	accelerationStructureWrite.dstBinding = 0;// SWS_SCENE_AS_BINDING;
     accelerationStructureWrite.dstArrayElement = 0;
     accelerationStructureWrite.descriptorCount = 1;
     accelerationStructureWrite.descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
@@ -880,8 +578,8 @@ void RtxApp::UpdateDescriptorSets() {
     VkWriteDescriptorSet resultImageWrite;
     resultImageWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     resultImageWrite.pNext = nullptr;
-    resultImageWrite.dstSet = mRTDescriptorSets[SWS_RESULT_IMAGE_SET];
-    resultImageWrite.dstBinding = SWS_RESULT_IMAGE_BINDING;
+    resultImageWrite.dstSet = mRTDescriptorSet;
+	resultImageWrite.dstBinding = 1;// SWS_RESULT_IMAGE_BINDING;
     resultImageWrite.dstArrayElement = 0;
     resultImageWrite.descriptorCount = 1;
     resultImageWrite.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
@@ -889,95 +587,9 @@ void RtxApp::UpdateDescriptorSets() {
     resultImageWrite.pBufferInfo = nullptr;
     resultImageWrite.pTexelBufferView = nullptr;
 
-    ///////////////////////////////////////////////////////////
-
-    VkDescriptorBufferInfo camdataBufferInfo;
-    camdataBufferInfo.buffer = mCameraBuffer.GetBuffer();
-    camdataBufferInfo.offset = 0;
-    camdataBufferInfo.range = mCameraBuffer.GetSize();
-
-    VkWriteDescriptorSet camdataBufferWrite;
-    camdataBufferWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    camdataBufferWrite.pNext = nullptr;
-    camdataBufferWrite.dstSet = mRTDescriptorSets[SWS_CAMDATA_SET];
-    camdataBufferWrite.dstBinding = SWS_CAMDATA_BINDING;
-    camdataBufferWrite.dstArrayElement = 0;
-    camdataBufferWrite.descriptorCount = 1;
-    camdataBufferWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    camdataBufferWrite.pImageInfo = nullptr;
-    camdataBufferWrite.pBufferInfo = &camdataBufferInfo;
-    camdataBufferWrite.pTexelBufferView = nullptr;
-
-    ///////////////////////////////////////////////////////////
-
-    VkWriteDescriptorSet matIDsBufferWrite;
-    matIDsBufferWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    matIDsBufferWrite.pNext = nullptr;
-    matIDsBufferWrite.dstSet = mRTDescriptorSets[SWS_MATIDS_SET];
-    matIDsBufferWrite.dstBinding = 0;
-    matIDsBufferWrite.dstArrayElement = 0;
-    matIDsBufferWrite.descriptorCount = numMeshes;
-    matIDsBufferWrite.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    matIDsBufferWrite.pImageInfo = nullptr;
-    matIDsBufferWrite.pBufferInfo = mScene.matIDsBufferInfos.data();
-    matIDsBufferWrite.pTexelBufferView = nullptr;
-
-    ///////////////////////////////////////////////////////////
-
-    VkWriteDescriptorSet attribsBufferWrite;
-    attribsBufferWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    attribsBufferWrite.pNext = nullptr;
-    attribsBufferWrite.dstSet = mRTDescriptorSets[SWS_ATTRIBS_SET];
-    attribsBufferWrite.dstBinding = 0;
-    attribsBufferWrite.dstArrayElement = 0;
-    attribsBufferWrite.descriptorCount = numMeshes;
-    attribsBufferWrite.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    attribsBufferWrite.pImageInfo = nullptr;
-    attribsBufferWrite.pBufferInfo = mScene.attribsBufferInfos.data();
-    attribsBufferWrite.pTexelBufferView = nullptr;
-
-    ///////////////////////////////////////////////////////////
-
-    VkWriteDescriptorSet facesBufferWrite;
-    facesBufferWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    facesBufferWrite.pNext = nullptr;
-    facesBufferWrite.dstSet = mRTDescriptorSets[SWS_FACES_SET];
-    facesBufferWrite.dstBinding = 0;
-    facesBufferWrite.dstArrayElement = 0;
-    facesBufferWrite.descriptorCount = numMeshes;
-    facesBufferWrite.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    facesBufferWrite.pImageInfo = nullptr;
-    facesBufferWrite.pBufferInfo = mScene.facesBufferInfos.data();
-    facesBufferWrite.pTexelBufferView = nullptr;
-
-    ///////////////////////////////////////////////////////////
-
-    VkWriteDescriptorSet texturesBufferWrite;
-    texturesBufferWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    texturesBufferWrite.pNext = nullptr;
-    texturesBufferWrite.dstSet = mRTDescriptorSets[SWS_TEXTURES_SET];
-    texturesBufferWrite.dstBinding = 0;
-    texturesBufferWrite.dstArrayElement = 0;
-    texturesBufferWrite.descriptorCount = numMaterials;
-    texturesBufferWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    texturesBufferWrite.pImageInfo = mScene.texturesInfos.data();
-    texturesBufferWrite.pBufferInfo = nullptr;
-    texturesBufferWrite.pTexelBufferView = nullptr;
-
-    ///////////////////////////////////////////////////////////
-
     Array<VkWriteDescriptorSet> descriptorWrites({
         accelerationStructureWrite,
         resultImageWrite,
-        camdataBufferWrite,
-        //
-        matIDsBufferWrite,
-        //
-        attribsBufferWrite,
-        //
-        facesBufferWrite,
-        //
-        texturesBufferWrite
     });
 
     vkUpdateDescriptorSets(mDevice, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, VK_NULL_HANDLE);
