@@ -20,9 +20,7 @@ void main() {
 
     const uint rayFlags =  gl_RayFlagsOpaqueEXT;
     const uint cullMask = 0xFF;
-    const uint sbtRecordOffset = 0;
-    const uint sbtRecordStride = 1;
-    const uint missIndex = 0;
+    const uint stbRecordStride = 1;
     const float tmin = 0.0f;
     const float tmax = 10.0f;
     const int payloadLocation = 0;
@@ -31,9 +29,9 @@ void main() {
     traceRayEXT(Scene,
              rayFlags,
              cullMask,
-             sbtRecordOffset,
-             sbtRecordStride,
-             missIndex,
+			SWS_PRIMARY_HIT_SHADERS_IDX,
+			stbRecordStride,
+			SWS_PRIMARY_MISS_SHADERS_IDX,
              origin,
              tmin,
              direction,

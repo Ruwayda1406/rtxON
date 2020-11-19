@@ -112,7 +112,7 @@ void RtxApp::FillCommandBuffer(VkCommandBuffer commandBuffer, const size_t image
 
     VkStridedBufferRegionKHR callableSBT = {};
 
-    vkCmdTraceRaysKHR(commandBuffer, &raygenSBT, &missSBT, &hitSBT, &callableSBT, mSettings.resolutionX, mSettings.resolutionY, 1u);
+   vkCmdTraceRaysKHR(commandBuffer, &raygenSBT, &missSBT, &hitSBT, &callableSBT, mSettings.resolutionX, mSettings.resolutionY, 1u);
 }
 
 
@@ -206,7 +206,9 @@ void RtxApp::LoadSceneGeometry() {
 	std::vector<tinyobj::material_t> materials;
 	String warn, error;
 
-	String fileName = sScenesFolder + "fake_whitted/fake_whitted.obj";
+	String fileName = sScenesFolder + "fake_whitted/fake_whitted.obj"; 
+	//String fileName = sScenesFolder + "suzanne.obj";
+
 	String baseDir = fileName;
 	const size_t slash = baseDir.find_last_of('/');
 	if (slash != String::npos) {
