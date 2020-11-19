@@ -26,7 +26,7 @@
 #define SWS_MATIDS_SET                  3
 #define SWS_TEXTURES_SET                4
 
-#define SWS_NUM_SETS                    3
+#define SWS_NUM_SETS                    2
 
 // cross-shader locations
 #define SWS_LOC_PRIMARY_RAY             0
