@@ -4,10 +4,10 @@
 
 #include "../shared_with_shaders.h"
 
-layout(set = 0, binding = 0) uniform accelerationStructureEXT Scene;
-layout(set = 0, binding = 1, rgba8) uniform image2D ResultImage;
+layout(set = SWS_SCENE_AS_SET, binding = SWS_SCENE_AS_BINDING)            uniform accelerationStructureEXT Scene;
+layout(set = SWS_RESULT_IMAGE_SET, binding = SWS_RESULT_IMAGE_BINDING, rgba8) uniform image2D ResultImage;
 
-layout(location = 0) rayPayloadEXT vec3 ResultColor;
+layout(location = SWS_LOC_PRIMARY_RAY) rayPayloadEXT RayPayload PrimaryRay;
 
 void main() {
    const vec2 curPixel = vec2(gl_LaunchIDEXT.xy);
@@ -21,12 +21,13 @@ void main() {
     const uint rayFlags =  gl_RayFlagsOpaqueEXT;
     const uint cullMask = 0xFF;
     const uint sbtRecordOffset = 0;
-    const uint sbtRecordStride = 0;
+    const uint sbtRecordStride = 1;
     const uint missIndex = 0;
     const float tmin = 0.0f;
     const float tmax = 10.0f;
     const int payloadLocation = 0;
 
+	vec3 finalColor = vec3(0.0f);
     traceRayEXT(Scene,
              rayFlags,
              cullMask,
@@ -37,7 +38,12 @@ void main() {
              tmin,
              direction,
              tmax,
-             payloadLocation);
+		SWS_LOC_PRIMARY_RAY);
 
-    imageStore(ResultImage, ivec2(gl_LaunchIDEXT.xy), vec4(ResultColor, 1.0f));
+	const vec3 hitColor = PrimaryRay.colorAndDist.rgb;
+	const float hitDistance = PrimaryRay.colorAndDist.w;
+
+	finalColor += hitColor;
+
+	imageStore(ResultImage, ivec2(gl_LaunchIDEXT.xy), vec4(LinearToSrgb(finalColor), 1.0f));
 }

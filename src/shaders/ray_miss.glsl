@@ -4,9 +4,10 @@
 
 #include "../shared_with_shaders.h"
 
-layout(location = 0) rayPayloadInEXT vec3 ResultColor;
+layout(location = SWS_LOC_PRIMARY_RAY) rayPayloadInEXT RayPayload PrimaryRay;
 
 void main() {
-    const vec3 backgroundColor = vec3(0.412f, 0.796f, 1.0f);
-    ResultColor = backgroundColor;
+	const vec3 backgroundColor = vec3(0.412f, 0.796f, 1.0f);
+	PrimaryRay.colorAndDist = vec4(backgroundColor, -1.0f);
+	PrimaryRay.normalAndObjId = vec4(0.0f);
 }

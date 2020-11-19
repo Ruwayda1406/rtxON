@@ -9,10 +9,26 @@ struct RTAccelerationStructure {
     VkAccelerationStructureKHR              accelerationStructure;
     VkDeviceAddress                         handle;
 };
+struct RTMesh {
+	uint32_t                    numVertices;
+	uint32_t                    numFaces;
 
+	vulkanhelpers::Buffer       positions;
+	vulkanhelpers::Buffer       attribs;
+	vulkanhelpers::Buffer       indices;
+	vulkanhelpers::Buffer       faces;
+
+	RTAccelerationStructure     blas;
+};
 struct RTScene {
-	Array<RTAccelerationStructure>  bottomLevelAS;
+	Array<RTMesh>                   meshes;
 	RTAccelerationStructure         topLevelAS;
+
+	// shader resources stuff
+	//Array<VkDescriptorBufferInfo>   matIDsBufferInfos;
+	Array<VkDescriptorBufferInfo>   attribsBufferInfos;
+	Array<VkDescriptorBufferInfo>   facesBufferInfos;
+	//Array<VkDescriptorImageInfo>    texturesInfos;
 };
 
 class SBTHelper {
@@ -85,9 +101,10 @@ private:
 	VkPipelineLayout                mRTPipelineLayout;
 
     VkDescriptorPool                mRTDescriptorPool;
-    VkDescriptorSet          mRTDescriptorSet;
-	VkDescriptorSetLayout    mRTDescriptorSetsLayout;
-
+    //VkDescriptorSet          mRTDescriptorSet;
+	//VkDescriptorSetLayout    mRTDescriptorSetsLayout;
+	Array<VkDescriptorSet>          mRTDescriptorSets;
+	Array<VkDescriptorSetLayout>    mRTDescriptorSetsLayouts;
     SBTHelper                       mSBT;
     RTScene                         mScene;
 };

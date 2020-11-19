@@ -20,12 +20,13 @@
 #define SWS_CAMDATA_SET                 0
 #define SWS_CAMDATA_BINDING             2
 
-#define SWS_MATIDS_SET                  1
-#define SWS_ATTRIBS_SET                 2
-#define SWS_FACES_SET                   3
+
+#define SWS_ATTRIBS_SET                 1
+#define SWS_FACES_SET                   2
+#define SWS_MATIDS_SET                  3
 #define SWS_TEXTURES_SET                4
 
-#define SWS_NUM_SETS                    5
+#define SWS_NUM_SETS                    3
 
 // cross-shader locations
 #define SWS_LOC_PRIMARY_RAY             0
