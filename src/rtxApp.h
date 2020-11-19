@@ -1,7 +1,6 @@
 #pragma once
 
 #include "framework/vulkanapp.h"
-#include "framework/camera.h"
 
 struct RTAccelerationStructure {
     VkDeviceMemory                          memory;
@@ -89,6 +88,7 @@ private:
                   const VkAccelerationStructureCreateGeometryTypeInfoKHR* geometries,
                   const uint32_t instanceCount,
                   RTAccelerationStructure& _as);
+	void CreateCamera();
 	void LoadSceneGeometry2();
 	void LoadSceneGeometry();
     void CreateScene();
@@ -107,4 +107,31 @@ private:
 	Array<VkDescriptorSetLayout>    mRTDescriptorSetsLayouts;
     SBTHelper                       mSBT;
     RTScene                         mScene;
+	// camera 
+	struct Camera
+{
+	Recti   mViewport;
+	float   mFov;
+	float   mNear;
+	float   mFar;
+	vec3    mPosition;
+	vec3    mLookAtPostion;
+	vec3    mDirection;
+
+	mat4    mProjection;
+	mat4    mTransform;
+	vec3    Up;
+
+	Camera() : Up(0.0f, 1.0f, 0.0f)
+		, mFov(45.0f)
+		, mNear(0.1f)
+		, mFar(100.0f)
+		, mPosition(0.25f, 3.20f, 6.15f) //vec3(0.25f, 3.20f, 6.15f)
+		, mLookAtPostion(0.25f, 2.75f, 5.25f) 
+    {
+		mDirection = normalize(mLookAtPostion - mPosition);
+	}
+};
+	Camera                          mCamera;
+	vulkanhelpers::Buffer           mCameraBuffer;
 };

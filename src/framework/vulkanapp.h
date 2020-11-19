@@ -35,6 +35,8 @@ public:
 
     void    Run();
 
+	
+
 protected:
     bool    Initialize();
     void    Loop();
@@ -65,8 +67,8 @@ protected:
     virtual void OnMouseButton(const int button, const int action, const int mods);
     virtual void OnKey(const int key, const int scancode, const int action, const int mods);
     virtual void Update(const size_t imageIndex, const float dt);
-
 protected:
+	GLFWwindow* window;
     AppSettings             mSettings;
     GLFWwindow*             mWindow;
 

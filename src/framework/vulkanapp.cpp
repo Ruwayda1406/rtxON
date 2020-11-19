@@ -3,7 +3,6 @@
 // include volk.c for implementation
 #include "volk.c"
 
-
 void FPSMeter::Update(const float dt) {
     this->fpsAccumulator += dt - this->fpsHistory[this->historyPointer];
     this->fpsHistory[this->historyPointer] = dt;
@@ -54,6 +53,7 @@ void VulkanApp::Run() {
     }
 }
 
+
 bool VulkanApp::Initialize() {
     if (!glfwInit()) {
         return false;
@@ -71,7 +71,7 @@ bool VulkanApp::Initialize() {
 
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-    GLFWwindow* window = glfwCreateWindow(static_cast<int>(mSettings.resolutionX),
+    window = glfwCreateWindow(static_cast<int>(mSettings.resolutionX),
                                           static_cast<int>(mSettings.resolutionY),
                                           mSettings.name.c_str(),
                                           nullptr, nullptr);
@@ -130,6 +130,7 @@ bool VulkanApp::Initialize() {
     this->InitApp();
     this->FillCommandBuffers();
 
+
     return true;
 }
 
@@ -140,14 +141,14 @@ void VulkanApp::Loop() {
         curTime = glfwGetTime();
         deltaTime = curTime - prevTime;
         prevTime = curTime;
-
         this->ProcessFrame(static_cast<float>(deltaTime));
-
+	
         glfwPollEvents();
     }
 }
 
 void VulkanApp::Shutdown() {
+
     vkDeviceWaitIdle(mDevice);
 
     glfwTerminate();
@@ -767,3 +768,4 @@ void VulkanApp::OnKey(const int, const int, const int, const int) {
 
 void VulkanApp::Update(const size_t, const float) {
 }
+

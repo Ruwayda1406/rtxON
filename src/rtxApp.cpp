@@ -8,12 +8,18 @@
 static const String sShadersFolder = "_data/shaders/";
 static const String sScenesFolder = "_data/scenes/";
 
+static vec3 lightPos = vec3(0.4f, 0.45f, 0.55f);
+static float sAmbientLight = 0.1f;
+static vec4 clearColor = vec4(1, 1, 1, 1.00f);
+
 RtxApp::RtxApp()
     : VulkanApp()
     , mRTPipelineLayout(VK_NULL_HANDLE)
     , mRTPipeline(VK_NULL_HANDLE)
     , mRTDescriptorPool(VK_NULL_HANDLE)
 {
+	
+
 }
 RtxApp::~RtxApp() {
 
@@ -30,9 +36,10 @@ void RtxApp::InitSettings() {
 
 void RtxApp::InitApp() {
 
-	//this->LoadSceneGeometry();
-	this->LoadSceneGeometry2();
+	this->LoadSceneGeometry();
+//	this->LoadSceneGeometry2();
     this->CreateScene();
+	this->CreateCamera();
     this->CreateDescriptorSetsLayouts();
     this->CreateRaytracingPipelineAndSBT();
     this->UpdateDescriptorSets();
@@ -135,7 +142,29 @@ void RtxApp::Update(const size_t, const float dt) {
 }
 
 
+void RtxApp::CreateCamera() {
+	VkResult error = mCameraBuffer.Create(sizeof(UniformParams), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_RAY_TRACING_BIT_KHR, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+	CHECK_VK_ERROR(error, "mCameraBuffer.Create");
 
+	Recti   mViewport = { 0, 0,static_cast<int>(mSettings.resolutionX)  , static_cast<int>(mSettings.resolutionY) };
+	const float aspect = static_cast<float>(mViewport.right - mViewport.left) / static_cast<float>(mViewport.bottom - mViewport.top);
+	mCamera.mProjection = glm::perspectiveRH_ZO<float>(Deg2Rad(mCamera.mFov), aspect, mCamera.mNear, mCamera.mFar);
+	mCamera.mTransform = MatLookAt(mCamera.mPosition, mCamera.mLookAtPostion, mCamera.Up);
+
+	UniformParams* params = reinterpret_cast<UniformParams*>(mCameraBuffer.Map());
+    params->lightPos = lightPos;
+	params->sAmbientLight = sAmbientLight;
+
+	params->camPos = vec4(mCamera.mPosition, 0.0f);
+	params->camDir = vec4(mCamera.mDirection, 0.0f);
+	params->camUp = vec4(mCamera.Up, 0.0f);
+	params->camSide = vec4(vec3(mCamera.mTransform[0][0], mCamera.mTransform[1][0], mCamera.mTransform[2][0]), 0.0f);
+	params->camFar = mCamera.mFar;
+	params->camFov = mCamera.mFov;
+	params->camNear = mCamera.mNear;
+
+    mCameraBuffer.Unmap();
+}
 bool RtxApp::CreateAS(const VkAccelerationStructureTypeKHR type,
                       const uint32_t geometryCount,
                       const VkAccelerationStructureCreateGeometryTypeInfoKHR* geometries,
@@ -236,8 +265,8 @@ void RtxApp::LoadSceneGeometry2() {
 		attribs[i].normal.x = obj.normals[i].x;
 		attribs[i].normal.y = obj.normals[i].y;
 		attribs[i].normal.z = obj.normals[i].z;
-		//attribs[i].uv.x = obj.texCoords[i].x;
-	//	attribs[i].uv.y = obj.texCoords[i].y;
+		attribs[i].uv.x = obj.texCoords[i].x;
+		attribs[i].uv.y = obj.texCoords[i].y;
 	}
 	for (unsigned int i = 0; i < numFaces; ++i)
 	{
@@ -273,8 +302,8 @@ void RtxApp::LoadSceneGeometry() {
 	std::vector<tinyobj::material_t> materials;
 	String warn, error;
 
-	String fileName = sScenesFolder + "fake_whitted/fake_whitted.obj"; 
-	//String fileName = sScenesFolder + "suzanne.obj";
+	String fileName = sScenesFolder + "fake_whitted.obj"; 
+//	String fileName = sScenesFolder + "cube.obj";
 
 	String baseDir = fileName;
 	const size_t slash = baseDir.find_last_of('/');
@@ -570,6 +599,7 @@ void RtxApp::CreateDescriptorSetsLayouts() {
     // First set:
     //  binding 0  ->  AS
     //  binding 1  ->  output image
+	//  binding 2  ->  Camera data
 
     VkDescriptorSetLayoutBinding accelerationStructureLayoutBinding;
 	accelerationStructureLayoutBinding.binding =  SWS_SCENE_AS_BINDING;
@@ -585,12 +615,18 @@ void RtxApp::CreateDescriptorSetsLayouts() {
     resultImageLayoutBinding.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
     resultImageLayoutBinding.pImmutableSamplers = nullptr;
 
+	VkDescriptorSetLayoutBinding camdataBufferBinding;
+	camdataBufferBinding.binding = SWS_CAMDATA_BINDING;
+	camdataBufferBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	camdataBufferBinding.descriptorCount = 1;
+	camdataBufferBinding.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+	camdataBufferBinding.pImmutableSamplers = nullptr;
 
-
-    std::vector<VkDescriptorSetLayoutBinding> bindings({
-        accelerationStructureLayoutBinding,
-        resultImageLayoutBinding,
-    });
+	std::vector<VkDescriptorSetLayoutBinding> bindings({
+		accelerationStructureLayoutBinding,
+		resultImageLayoutBinding,
+		camdataBufferBinding
+		});
 
     VkDescriptorSetLayoutCreateInfo layoutInfo;
 	layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -782,14 +818,33 @@ void RtxApp::UpdateDescriptorSets() {
 	attribsBufferWrite.pImageInfo = nullptr;
 	attribsBufferWrite.pBufferInfo = mScene.attribsBufferInfos.data();
 	attribsBufferWrite.pTexelBufferView = nullptr;
-
 	///////////////////////////////////////////////////////////
+
+	VkDescriptorBufferInfo camdataBufferInfo;
+	camdataBufferInfo.buffer = mCameraBuffer.GetBuffer();
+	camdataBufferInfo.offset = 0;
+	camdataBufferInfo.range = mCameraBuffer.GetSize();
+
+	VkWriteDescriptorSet camdataBufferWrite;
+	camdataBufferWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	camdataBufferWrite.pNext = nullptr;
+	camdataBufferWrite.dstSet = mRTDescriptorSets[SWS_CAMDATA_SET];
+	camdataBufferWrite.dstBinding = SWS_CAMDATA_BINDING;
+	camdataBufferWrite.dstArrayElement = 0;
+	camdataBufferWrite.descriptorCount = 1;
+	camdataBufferWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	camdataBufferWrite.pImageInfo = nullptr;
+	camdataBufferWrite.pBufferInfo = &camdataBufferInfo;
+	camdataBufferWrite.pTexelBufferView = nullptr;
+	///////////////////////////////////////////////////////////
+
     Array<VkWriteDescriptorSet> descriptorWrites({
         accelerationStructureWrite,
         resultImageWrite,
 		//
 	   attribsBufferWrite,
 	   //
+	   camdataBufferWrite,
     });
 
     vkUpdateDescriptorSets(mDevice, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, VK_NULL_HANDLE);

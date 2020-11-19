@@ -57,14 +57,17 @@ struct VertexAttribute {
 // packed std140
 struct UniformParams {
     // Lighting
-    vec4 sunPosAndAmbient;
+    vec3 lightPos;
+	float sAmbientLight;
 
     // Camera
     vec4 camPos;
     vec4 camDir;
     vec4 camUp;
     vec4 camSide;
-    vec4 camNearFarFov;
+    float camNear;
+	float camFar;
+	float camFov;
 };
 
 
