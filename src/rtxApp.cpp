@@ -8,7 +8,7 @@
 static const String sShadersFolder = "_data/shaders/";
 static const String sScenesFolder = "_data/scenes/";
 
-static vec3 lightPos = vec3(0.4f, 0.45f, 0.55f);
+static vec3 lightPos = vec3(0.4f, 1.45f, 0.55f);
 static float sAmbientLight = 0.1f;
 static vec4 clearColor = vec4(1, 1, 1, 1.00f);
 
@@ -146,10 +146,13 @@ void RtxApp::CreateCamera() {
 	VkResult error = mCameraBuffer.Create(sizeof(UniformParams), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_RAY_TRACING_BIT_KHR, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 	CHECK_VK_ERROR(error, "mCameraBuffer.Create");
 
+	
+
 	Recti   mViewport = { 0, 0,static_cast<int>(mSettings.resolutionX)  , static_cast<int>(mSettings.resolutionY) };
 	const float aspect = static_cast<float>(mViewport.right - mViewport.left) / static_cast<float>(mViewport.bottom - mViewport.top);
+
 	mCamera.mProjection = glm::perspectiveRH_ZO<float>(Deg2Rad(mCamera.mFov), aspect, mCamera.mNear, mCamera.mFar);
-	mCamera.mTransform = MatLookAt(mCamera.mPosition, mCamera.mLookAtPostion, mCamera.Up);
+	mCamera.mView =  glm::lookAt(mCamera.mPosition, mCamera.mLookAtPostion, mCamera.Up);
 
 	UniformParams* params = reinterpret_cast<UniformParams*>(mCameraBuffer.Map());
     params->lightPos = lightPos;
@@ -158,11 +161,10 @@ void RtxApp::CreateCamera() {
 	params->camPos = vec4(mCamera.mPosition, 0.0f);
 	params->camDir = vec4(mCamera.mDirection, 0.0f);
 	params->camUp = vec4(mCamera.Up, 0.0f);
-	params->camSide = vec4(vec3(mCamera.mTransform[0][0], mCamera.mTransform[1][0], mCamera.mTransform[2][0]), 0.0f);
+	params->camSide = vec4(vec3(mCamera.mView[0][0], mCamera.mView[1][0], mCamera.mView[2][0]), 0.0f);
 	params->camFar = mCamera.mFar;
 	params->camFov = mCamera.mFov;
 	params->camNear = mCamera.mNear;
-
     mCameraBuffer.Unmap();
 }
 bool RtxApp::CreateAS(const VkAccelerationStructureTypeKHR type,
@@ -229,73 +231,6 @@ bool RtxApp::CreateAS(const VkAccelerationStructureTypeKHR type,
 	
     return true;
 }
-void RtxApp::LoadSceneGeometry2() {
-
-	ObjLoader* loader = new ObjLoader(true, true, true);
-	objMesh obj = loader->loadOBJ("_data/scenes/bs_ears.obj");
-	int meshIdx = 0;
-	RTMesh mesh;
-	const size_t numFaces = obj.faces.size();
-	const size_t numVertices = obj.points.size();
-
-	mesh.numVertices = static_cast<uint32_t>(numVertices);
-	mesh.numFaces = static_cast<uint32_t>(numFaces);
-
-	const size_t positionsBufferSize = numVertices * sizeof(vec3);
-	const size_t indicesBufferSize = numFaces * 3 * sizeof(uint32_t);
-	const size_t attribsBufferSize = numVertices * sizeof(VertexAttribute);
-
-	VkResult error = mesh.positions.Create(positionsBufferSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_RAY_TRACING_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-	CHECK_VK_ERROR(error, "mesh.positions.Create");
-
-	error = mesh.indices.Create(indicesBufferSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_RAY_TRACING_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-	CHECK_VK_ERROR(error, "mesh.indices.Create");
-	error = mesh.attribs.Create(attribsBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_RAY_TRACING_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-	CHECK_VK_ERROR(error, "mesh.attribs.Create");
-
-	vec3* positions = reinterpret_cast<vec3*>(mesh.positions.Map());
-	VertexAttribute* attribs = reinterpret_cast<VertexAttribute*>(mesh.attribs.Map());
-	uint32_t* indices = reinterpret_cast<uint32_t*>(mesh.indices.Map());
-
-	for (int i = 0; i < numVertices; ++i)
-	{
-		positions[i].x = obj.points[i].x;
-		positions[i].y = obj.points[i].y;
-		positions[i].z = obj.points[i].z;
-		attribs[i].normal.x = obj.normals[i].x;
-		attribs[i].normal.y = obj.normals[i].y;
-		attribs[i].normal.z = obj.normals[i].z;
-		attribs[i].uv.x = obj.texCoords[i].x;
-		attribs[i].uv.y = obj.texCoords[i].y;
-	}
-	for (unsigned int i = 0; i < numFaces; ++i)
-	{
-		const uint32_t a = static_cast<uint32_t>(obj.faces[i].x);
-		const uint32_t b = static_cast<uint32_t>(obj.faces[i].y);
-		const uint32_t c = static_cast<uint32_t>(obj.faces[i].z);
-		indices[a] = a;
-		indices[b] = b;
-		indices[c] = c;
-	}
-
-	mesh.indices.Unmap();
-	mesh.attribs.Unmap();
-	mesh.positions.Unmap();
-
-	mScene.meshes.push_back(mesh);
-	// prepare shader resources infos
-	const size_t numMeshes = mScene.meshes.size();
-
-	mScene.attribsBufferInfos.resize(numMeshes);
-	for (size_t i = 0; i < numMeshes; ++i) {
-		const RTMesh& mesh = mScene.meshes[i];
-		VkDescriptorBufferInfo& attribsInfo = mScene.attribsBufferInfos[i];
-		attribsInfo.buffer = mesh.attribs.GetBuffer();
-		attribsInfo.offset = 0;
-		attribsInfo.range = mesh.attribs.GetSize();
-	}
-	
-}
 void RtxApp::LoadSceneGeometry() {
 	tinyobj::attrib_t attrib;
 	std::vector<tinyobj::shape_t> shapes;
@@ -327,6 +262,7 @@ void RtxApp::LoadSceneGeometry() {
 
 			const size_t positionsBufferSize = numVertices * sizeof(vec3);
 			const size_t indicesBufferSize = numFaces * 3 * sizeof(uint32_t);
+			const size_t facesBufferSize = numFaces * sizeof(ivec3);
 			const size_t attribsBufferSize = numVertices * sizeof(VertexAttribute);
 
 			VkResult error = mesh.positions.Create(positionsBufferSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_RAY_TRACING_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
@@ -335,6 +271,8 @@ void RtxApp::LoadSceneGeometry() {
 			error = mesh.indices.Create(indicesBufferSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_RAY_TRACING_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 			CHECK_VK_ERROR(error, "mesh.indices.Create");
 
+			error = mesh.faces.Create(facesBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_RAY_TRACING_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+			CHECK_VK_ERROR(error, "mesh.faces.Create");
 
 			error = mesh.attribs.Create(attribsBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_RAY_TRACING_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 			CHECK_VK_ERROR(error, "mesh.attribs.Create");
@@ -342,6 +280,7 @@ void RtxApp::LoadSceneGeometry() {
 			vec3* positions = reinterpret_cast<vec3*>(mesh.positions.Map());
 			VertexAttribute* attribs = reinterpret_cast<VertexAttribute*>(mesh.attribs.Map());
 			uint32_t* indices = reinterpret_cast<uint32_t*>(mesh.indices.Map());
+			ivec3* faces = reinterpret_cast<ivec3*>(mesh.faces.Map());
 
 			size_t vIdx = 0;
 			for (size_t f = 0; f < numFaces; ++f) {
@@ -369,6 +308,8 @@ void RtxApp::LoadSceneGeometry() {
 				indices[a] = a;
 				indices[b] = b;
 				indices[c] = c;
+
+				faces[f] = ivec3(a,b,c);
 			}
 
 			mesh.indices.Unmap();
@@ -380,15 +321,19 @@ void RtxApp::LoadSceneGeometry() {
 	// prepare shader resources infos
 	const size_t numMeshes = mScene.meshes.size();
 	mScene.attribsBufferInfos.resize(numMeshes);
+	mScene.facesBufferInfos.resize(numMeshes);
 	for (size_t i = 0; i < numMeshes; ++i) {
 		const RTMesh& mesh = mScene.meshes[i];
 		VkDescriptorBufferInfo& attribsInfo = mScene.attribsBufferInfos[i];
-
+		VkDescriptorBufferInfo& facesInfo = mScene.facesBufferInfos[i];
 
 		attribsInfo.buffer = mesh.attribs.GetBuffer();
 		attribsInfo.offset = 0;
 		attribsInfo.range = mesh.attribs.GetSize();
 
+		facesInfo.buffer = mesh.faces.GetBuffer();
+		facesInfo.offset = 0;
+		facesInfo.range = mesh.faces.GetSize();
 	}
 
 }
@@ -673,8 +618,8 @@ void RtxApp::CreateDescriptorSetsLayouts() {
 	//  binding 0 .. N  ->  faces info (indices) for our meshes  (N = num meshes)
 	//   (re-using second's set info)
 
-	//error = vkCreateDescriptorSetLayout(mDevice, &set1LayoutInfo, nullptr, &mRTDescriptorSetsLayouts[SWS_FACES_SET]);
-	//CHECK_VK_ERROR(error, L"vkCreateDescriptorSetLayout");
+	error = vkCreateDescriptorSetLayout(mDevice, &set1LayoutInfo, nullptr, &mRTDescriptorSetsLayouts[SWS_FACES_SET]);
+	CHECK_VK_ERROR(error, L"vkCreateDescriptorSetLayout");
 
 }
 
@@ -820,6 +765,19 @@ void RtxApp::UpdateDescriptorSets() {
 	attribsBufferWrite.pTexelBufferView = nullptr;
 	///////////////////////////////////////////////////////////
 
+	VkWriteDescriptorSet facesBufferWrite;
+	facesBufferWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	facesBufferWrite.pNext = nullptr;
+	facesBufferWrite.dstSet = mRTDescriptorSets[SWS_FACES_SET];
+	facesBufferWrite.dstBinding = 0;
+	facesBufferWrite.dstArrayElement = 0;
+	facesBufferWrite.descriptorCount = numMeshes;
+	facesBufferWrite.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	facesBufferWrite.pImageInfo = nullptr;
+	facesBufferWrite.pBufferInfo = mScene.facesBufferInfos.data();
+	facesBufferWrite.pTexelBufferView = nullptr;
+
+	///////////////////////////////////////////////////////////
 	VkDescriptorBufferInfo camdataBufferInfo;
 	camdataBufferInfo.buffer = mCameraBuffer.GetBuffer();
 	camdataBufferInfo.offset = 0;
@@ -843,6 +801,8 @@ void RtxApp::UpdateDescriptorSets() {
         resultImageWrite,
 		//
 	   attribsBufferWrite,
+	   //
+	   facesBufferWrite,
 	   //
 	   camdataBufferWrite,
     });

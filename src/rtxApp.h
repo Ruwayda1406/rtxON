@@ -119,17 +119,17 @@ private:
 	vec3    mDirection;
 
 	mat4    mProjection;
-	mat4    mTransform;
+	mat4    mView;
 	vec3    Up;
 
 	Camera() : Up(0.0f, 1.0f, 0.0f)
 		, mFov(45.0f)
 		, mNear(0.1f)
 		, mFar(100.0f)
-		, mPosition(0.25f, 3.20f, 6.15f) //vec3(0.25f, 3.20f, 6.15f)
-		, mLookAtPostion(0.25f, 2.75f, 5.25f) 
+		, mPosition(-1.0f, 2.5f, 7.0f) 
     {
-		mDirection = normalize(mLookAtPostion - mPosition);
+		mLookAtPostion = mPosition + vec3(0, 0, -1);
+		mDirection = glm::normalize(mLookAtPostion - mPosition);
 	}
 };
 	Camera                          mCamera;

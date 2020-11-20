@@ -34,6 +34,7 @@ String ToString(const T f, const int n = 6) {
 
 using vec2 = glm::highp_vec2;
 using vec3 = glm::highp_vec3;
+using ivec3 = glm::highp_ivec3;
 using vec4 = glm::highp_vec4;
 using mat4 = glm::highp_mat4;
 using quat = glm::highp_quat;

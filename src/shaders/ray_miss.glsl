@@ -7,7 +7,10 @@
 layout(location = SWS_LOC_PRIMARY_RAY) rayPayloadInEXT RayPayload PrimaryRay;
 
 void main() {
-	const vec3 backgroundColor = vec3(0.412f, 0.796f, 1.0f);
-	PrimaryRay.colorAndDist = vec4(backgroundColor, -1.0f);
-	PrimaryRay.normalAndObjId = vec4(0.0f);
+	const vec3 backgroundColor = vec3(0.2f, 0.2f, 0.2f);
+
+	PrimaryRay.color = backgroundColor;
+	PrimaryRay.normal = vec3(0.0f);
+	PrimaryRay.dist = -1.0;
+	PrimaryRay.objId = 0;
 }
