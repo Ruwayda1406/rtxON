@@ -1,0 +1,64 @@
+#version 460
+#extension GL_EXT_ray_tracing : enable
+#extension GL_GOOGLE_include_directive : require
+
+#include "../shared.h"
+
+layout(set = SWS_SCENE_AS_SET, binding = SWS_SCENE_AS_BINDING)            uniform accelerationStructureEXT Scene;
+layout(set = SWS_RESULT_IMAGE_SET, binding = SWS_RESULT_IMAGE_BINDING, rgba8) uniform image2D ResultImage;
+
+layout(set = SWS_CAMDATA_SET, binding = SWS_CAMDATA_BINDING, std140)     uniform AppData{
+	UniformParams Params;
+};
+
+layout(location = SWS_LOC_PRIMARY_RAY) rayPayloadEXT RayPayload PrimaryRay;
+
+
+vec3 CalcRayDir(vec2 pixel, float aspect) {
+
+	vec3 u = Params.camSide.xyz;
+	vec3 v = Params.camUp.xyz;
+
+	const float planeWidth = tan(Params.camFov* 0.5f);
+
+	u *= (planeWidth * aspect);
+	v *= planeWidth;
+
+	const vec3 rayDir = normalize(Params.camDir.xyz + (u * pixel.x) - (v * pixel.y));
+	return rayDir;
+}
+void main() {
+	//auto u = double(i) / (image_width - 1);
+	//auto v = double(j) / (image_height - 1);
+	const vec2 pixel = gl_LaunchIDEXT.xy / (gl_LaunchSizeEXT.xy - 1.0);
+	const float aspect = float(gl_LaunchSizeEXT.x) / float(gl_LaunchSizeEXT.y);
+
+	// Initialize a ray structure for our ray tracer
+	//ray origin
+	vec3 origin = Params.camPos.xyz;
+	//ray direction;
+	vec3 direction = CalcRayDir(pixel, aspect);
+
+	const uint rayFlags = gl_RayFlagsOpaqueEXT;
+	const uint cullMask = 0xFF;
+	const uint stbRecordStride = 0;
+	const float tmin = 0.0f;
+	const float tmax = Params.camFar;
+
+        traceRayEXT(Scene,
+			rayFlags,
+			cullMask,
+			SWS_PRIMARY_HIT_SHADERS_IDX,
+			stbRecordStride,
+			SWS_PRIMARY_MISS_SHADERS_IDX,
+			origin,
+			tmin,
+			direction,
+			tmax,
+			SWS_LOC_PRIMARY_RAY);
+
+	const vec3 hitColor = PrimaryRay.color;
+
+	imageStore(ResultImage, ivec2(gl_LaunchIDEXT.xy), vec4(LinearToSrgb(hitColor), 1.0f));
+}
+

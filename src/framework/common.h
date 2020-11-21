@@ -51,7 +51,20 @@ inline float Rad2Deg(const float rad) {
 inline float Deg2Rad(const float deg) {
     return deg * (MM_Pi / 180.0f);
 }
+glm::vec3 inline getRandomVec3(int min, int max)
+{
+	glm::vec3 r;
+	r.x = min + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (max - min)));
+	r.y = min + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (max - min)));
+	r.z = min + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (max - min)));
 
+	return r;
+}
+float inline getRandom(int min, int max)
+{
+	float r = min + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (max - min)));
+	return r;
+}
 template <typename T>
 inline T Max(const T& a, const T& b) {
     return a > b ? a : b;

@@ -8,8 +8,8 @@ static const String sShadersFolder = "_data/shaders/";
 static const String sScenesFolder = "_data/scenes/";
 
 static vec3 lightPos = vec3(0.4f, 1.45f, 0.55f);
-static float sAmbientLight = 0.1f;
-static vec4 clearColor = vec4(1, 1, 1, 1.00f);
+static float sAmbientLight = 0.5f;
+static vec3 backgroundColor = vec3(1, 1, 1);
 
 RtxApp::RtxApp()
     : VulkanApp()
@@ -24,11 +24,9 @@ RtxApp::~RtxApp() {
 
 }
 
-
 void RtxApp::InitSettings() {
     mSettings.name = "rtxON";
     mSettings.enableValidation = true;
-    mSettings.enableVSync = false;
     mSettings.supportRaytracing = true;
     mSettings.supportDescriptorIndexing = true;
 }
@@ -36,14 +34,26 @@ void RtxApp::InitSettings() {
 void RtxApp::InitApp() {
 
 	this->LoadSceneGeometry();
-//	this->LoadSceneGeometry2();
     this->CreateScene();
 	this->CreateCamera();
     this->CreateDescriptorSetsLayouts();
     this->CreateRaytracingPipelineAndSBT();
     this->UpdateDescriptorSets();
 }
+void RtxApp::updateUniformParams() {
 
+	UniformParams* params = reinterpret_cast<UniformParams*>(mCameraBuffer.Map());
+	params->lightPos = lightPos;
+	params->sAmbientLight = sAmbientLight;
+	params->camPos = vec4(mCamera.mPosition, 0.0f);
+	params->camDir = vec4(mCamera.mDirection, 0.0f);
+	params->camUp = vec4(mCamera.Up, 0.0f);
+	params->camSide = vec4(vec3(mCamera.mView[0][0], mCamera.mView[1][0], mCamera.mView[2][0]), 0.0f);
+	params->camFar = mCamera.mFar;
+	params->camFov = mCamera.mFov;
+	params->camNear = mCamera.mNear;
+	mCameraBuffer.Unmap();
+}
 void RtxApp::FreeResources() {
 
 	for (RTMesh& mesh : mScene.meshes) {
@@ -122,6 +132,27 @@ void RtxApp::FillCommandBuffer(VkCommandBuffer commandBuffer, const size_t image
    vkCmdTraceRaysKHR(commandBuffer, &raygenSBT, &missSBT, &hitSBT, &callableSBT, mSettings.resolutionX, mSettings.resolutionY, 1u);
 }
 
+void RtxApp::OnKey(const int key, const int scancode, const int action, const int mods)
+{
+	if (GLFW_PRESS == action) {
+		switch (key) {
+		moveDelta=vec2(0.0f, 0.0f);
+		case GLFW_KEY_W: moveDelta.y += 1.0f; moveCamera =true; break;
+		case GLFW_KEY_A: moveDelta.x -= 1.0f; moveCamera = true; break;
+		case GLFW_KEY_S: moveDelta.y -= 1.0f; moveCamera = true; break;
+		case GLFW_KEY_D: moveDelta.x += 1.0f; moveCamera = true; break;
+		}
+	}
+	else if (GLFW_RELEASE == action) {
+		switch (key) {
+		case GLFW_KEY_W: 
+		case GLFW_KEY_A: 
+		case GLFW_KEY_S:
+		case GLFW_KEY_D: moveCamera = false; break;
+			break;
+		}
+	}
+}
 
 void RtxApp::Update(const size_t, const float dt) {
     // Update FPS text
@@ -129,15 +160,17 @@ void RtxApp::Update(const size_t, const float dt) {
     String fullTitle = mSettings.name + "  " + frameStats;
     glfwSetWindowTitle(mWindow, fullTitle.c_str());
     /////////////////
+	if (moveCamera)
+	{
+		moveDelta *= sMoveSpeed * dt;
+		vec3 cameraSide = normalize(cross(mCamera.mDirection, mCamera.Up));
 
+		mCamera.mPosition += cameraSide * moveDelta.x;
+		mCamera.mPosition += mCamera.mDirection * moveDelta.y;
+		mCamera.mView = glm::lookAt(mCamera.mPosition, mCamera.mLookAtPostion, mCamera.Up);
+	}
 
-  //  UniformParams* params = reinterpret_cast<UniformParams*>(mCameraBuffer.Map());
-
- //   params->sunPosAndAmbient = vec4(sSunPos, sAmbientLight);
-
- //   this->UpdateCameraParams(params, dt);
-
-  //  mCameraBuffer.Unmap();
+	updateUniformParams();
 }
 
 
@@ -152,19 +185,6 @@ void RtxApp::CreateCamera() {
 
 	mCamera.mProjection = glm::perspectiveRH_ZO<float>(Deg2Rad(mCamera.mFov), aspect, mCamera.mNear, mCamera.mFar);
 	mCamera.mView =  glm::lookAt(mCamera.mPosition, mCamera.mLookAtPostion, mCamera.Up);
-
-	UniformParams* params = reinterpret_cast<UniformParams*>(mCameraBuffer.Map());
-    params->lightPos = lightPos;
-	params->sAmbientLight = sAmbientLight;
-
-	params->camPos = vec4(mCamera.mPosition, 0.0f);
-	params->camDir = vec4(mCamera.mDirection, 0.0f);
-	params->camUp = vec4(mCamera.Up, 0.0f);
-	params->camSide = vec4(vec3(mCamera.mView[0][0], mCamera.mView[1][0], mCamera.mView[2][0]), 0.0f);
-	params->camFar = mCamera.mFar;
-	params->camFov = mCamera.mFov;
-	params->camNear = mCamera.mNear;
-    mCameraBuffer.Unmap();
 }
 bool RtxApp::CreateAS(const VkAccelerationStructureTypeKHR type,
                       const uint32_t geometryCount,
@@ -259,10 +279,12 @@ void RtxApp::LoadSceneGeometry() {
 			mesh.numVertices = static_cast<uint32_t>(numVertices);
 			mesh.numFaces = static_cast<uint32_t>(numFaces);
 
+
 			const size_t positionsBufferSize = numVertices * sizeof(vec3);
 			const size_t indicesBufferSize = numFaces * 3 * sizeof(uint32_t);
 			const size_t facesBufferSize = numFaces * 4 * sizeof(uint32_t);
 			const size_t attribsBufferSize = numVertices * sizeof(VertexAttribute);
+			const size_t meshInfosBufferSize = 1 * sizeof(vec4);
 
 			VkResult error = mesh.positions.Create(positionsBufferSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_RAY_TRACING_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 			CHECK_VK_ERROR(error, "mesh.positions.Create");
@@ -276,10 +298,14 @@ void RtxApp::LoadSceneGeometry() {
 			error = mesh.attribs.Create(attribsBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_RAY_TRACING_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 			CHECK_VK_ERROR(error, "mesh.attribs.Create");
 
+			error = mesh.infos.Create(meshInfosBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_RAY_TRACING_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+			CHECK_VK_ERROR(error, "mesh.infos.Create");
+
 			vec3* positions = reinterpret_cast<vec3*>(mesh.positions.Map());
 			VertexAttribute* attribs = reinterpret_cast<VertexAttribute*>(mesh.attribs.Map());
 			uint32_t* indices = reinterpret_cast<uint32_t*>(mesh.indices.Map());
 			uint32_t* faces = reinterpret_cast<uint32_t*>(mesh.faces.Map());
+			vec4* infos = reinterpret_cast<vec4*>(mesh.infos.Map());
 
 			size_t vIdx = 0;
 			for (size_t f = 0; f < numFaces; ++f) {
@@ -312,20 +338,29 @@ void RtxApp::LoadSceneGeometry() {
 				faces[4 * f + 1] = b;
 				faces[4 * f + 2] = c;
 			}
+			vec4& info = infos[0];//random rgb color
+			info.x = 0.6;
+			info.y = 0.5;
+			info.z = getRandom(0.5, 1.0);
+			info.w = meshIdx;
+
 
 			mesh.indices.Unmap();
 			mesh.attribs.Unmap();
 			mesh.positions.Unmap();
 			mesh.faces.Unmap();
+			mesh.infos.Unmap();
 		}
 	}
 
 	// prepare shader resources infos
 	const size_t numMeshes = mScene.meshes.size();
+	mScene.meshInfoBufferInfos.resize(numMeshes);
 	mScene.attribsBufferInfos.resize(numMeshes);
 	mScene.facesBufferInfos.resize(numMeshes);
 	for (size_t i = 0; i < numMeshes; ++i) {
 		const RTMesh& mesh = mScene.meshes[i];
+		VkDescriptorBufferInfo& meshInfo = mScene.meshInfoBufferInfos[i];
 		VkDescriptorBufferInfo& attribsInfo = mScene.attribsBufferInfos[i];
 		VkDescriptorBufferInfo& facesInfo = mScene.facesBufferInfos[i];
 
@@ -336,6 +371,10 @@ void RtxApp::LoadSceneGeometry() {
 		facesInfo.buffer = mesh.faces.GetBuffer();
 		facesInfo.offset = 0;
 		facesInfo.range = mesh.faces.GetSize();
+
+		meshInfo.buffer = mesh.infos.GetBuffer();
+		meshInfo.offset = 0;
+		meshInfo.range = mesh.infos.GetSize();
 	}
 
 }
@@ -402,7 +441,7 @@ void RtxApp::CreateScene() {
     VkAccelerationStructureCreateGeometryTypeInfoKHR tlasGeoInfo = {};
     tlasGeoInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_GEOMETRY_TYPE_INFO_KHR;
     tlasGeoInfo.geometryType = VK_GEOMETRY_TYPE_INSTANCES_KHR;
-	tlasGeoInfo.maxPrimitiveCount = 1;// static_cast<uint32_t>(instances.size());
+	tlasGeoInfo.maxPrimitiveCount = static_cast<uint32_t>(instances.size());
     tlasGeoInfo.allowsTransforms = VK_TRUE;
 
     this->CreateAS(VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR, 1, &tlasGeoInfo, 1, mScene.topLevelAS);
@@ -623,6 +662,10 @@ void RtxApp::CreateDescriptorSetsLayouts() {
 	error = vkCreateDescriptorSetLayout(mDevice, &set1LayoutInfo, nullptr, &mRTDescriptorSetsLayouts[SWS_FACES_SET]);
 	CHECK_VK_ERROR(error, L"vkCreateDescriptorSetLayout");
 
+
+	error = vkCreateDescriptorSetLayout(mDevice, &set1LayoutInfo, nullptr, &mRTDescriptorSetsLayouts[SWS_MESHINFO_SET]);
+	CHECK_VK_ERROR(error, L"vkCreateDescriptorSetLayout");
+
 }
 
 void RtxApp::CreateRaytracingPipelineAndSBT() {
@@ -640,14 +683,9 @@ void RtxApp::CreateRaytracingPipelineAndSBT() {
     rayMissShader.LoadFromFile((sShadersFolder + "ray_miss.bin").c_str());
 
     mSBT.Initialize(1, 1, mRTProps.shaderGroupHandleSize, mRTProps.shaderGroupBaseAlignment);
-
     mSBT.SetRaygenStage(rayGenShader.GetShaderStage(VK_SHADER_STAGE_RAYGEN_BIT_KHR));
-
 	mSBT.AddStageToHitGroup({ rayChitShader.GetShaderStage(VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR) }, SWS_PRIMARY_HIT_SHADERS_IDX);
-    //mSBT.AddStageToHitGroup({ shadowChit.GetShaderStage(VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR) }, SWS_SHADOW_HIT_SHADERS_IDX);
-
 	mSBT.AddStageToMissGroup(rayMissShader.GetShaderStage(VK_SHADER_STAGE_MISS_BIT_KHR), SWS_PRIMARY_MISS_SHADERS_IDX);
-    //mSBT.AddStageToMissGroup(shadowMiss.GetShaderStage(VK_SHADER_STAGE_MISS_BIT_KHR), SWS_SHADOW_MISS_SHADERS_IDX);
 
 
 	// here are our groups map:
@@ -675,7 +713,8 @@ void RtxApp::UpdateDescriptorSets() {
     std::vector<VkDescriptorPoolSize> poolSizes({
         { VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 1 },       // top-level AS
         { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1 },                    // output image
-	    { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, numMeshes * 1 },       // vertex attribs for each mesh
+		 { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1 },                   // Camera data
+	    { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, numMeshes * 3 },       // vertex attribs+faces+infos for each mesh
 																	
 		});
 
@@ -696,6 +735,7 @@ void RtxApp::UpdateDescriptorSets() {
 		1,
 		numMeshes,      // vertex attribs for each mesh
 		numMeshes,      // faces buffer for each mesh
+		numMeshes,      // infos buffer for each mesh
 		});
 
 	VkDescriptorSetVariableDescriptorCountAllocateInfo variableDescriptorCountInfo;
@@ -766,7 +806,6 @@ void RtxApp::UpdateDescriptorSets() {
 	attribsBufferWrite.pBufferInfo = mScene.attribsBufferInfos.data();
 	attribsBufferWrite.pTexelBufferView = nullptr;
 	///////////////////////////////////////////////////////////
-
 	VkWriteDescriptorSet facesBufferWrite;
 	facesBufferWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 	facesBufferWrite.pNext = nullptr;
@@ -779,7 +818,20 @@ void RtxApp::UpdateDescriptorSets() {
 	facesBufferWrite.pBufferInfo = mScene.facesBufferInfos.data();
 	facesBufferWrite.pTexelBufferView = nullptr;
 
-	///////////////////////////////////////////////////////////
+	/////////////////////////////////////////////////////////// 
+	VkWriteDescriptorSet meshInfoBufferWrite;
+	meshInfoBufferWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	meshInfoBufferWrite.pNext = nullptr;
+	meshInfoBufferWrite.dstSet = mRTDescriptorSets[SWS_MESHINFO_SET];
+	meshInfoBufferWrite.dstBinding = 0;
+	meshInfoBufferWrite.dstArrayElement = 0;
+	meshInfoBufferWrite.descriptorCount = numMeshes;
+	meshInfoBufferWrite.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	meshInfoBufferWrite.pImageInfo = nullptr;
+	meshInfoBufferWrite.pBufferInfo = mScene.meshInfoBufferInfos.data();
+	meshInfoBufferWrite.pTexelBufferView = nullptr;
+
+	/////////////////////////////////////////////////////////// 
 	VkDescriptorBufferInfo camdataBufferInfo;
 	camdataBufferInfo.buffer = mCameraBuffer.GetBuffer();
 	camdataBufferInfo.offset = 0;
@@ -805,6 +857,8 @@ void RtxApp::UpdateDescriptorSets() {
 	   attribsBufferWrite,
 	   //
 	   facesBufferWrite,
+	   //
+	   meshInfoBufferWrite,
 	   //
 	   camdataBufferWrite,
     });

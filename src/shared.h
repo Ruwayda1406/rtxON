@@ -23,10 +23,10 @@
 
 #define SWS_ATTRIBS_SET                 1
 #define SWS_FACES_SET                   2
-#define SWS_MATIDS_SET                  3
+#define SWS_MESHINFO_SET                3
 #define SWS_TEXTURES_SET                4
 
-#define SWS_NUM_SETS                    3
+#define SWS_NUM_SETS                    4
 
 // cross-shader locations
 #define SWS_LOC_PRIMARY_RAY             0
@@ -34,11 +34,6 @@
 #define SWS_LOC_SHADOW_RAY              2
 
 #define SWS_MAX_RECURSION               10
-
-#define OBJECT_ID_BUNNY                 0.0f
-#define OBJECT_ID_PLANE                 1.0f
-#define OBJECT_ID_TEAPOT                2.0f
-
 
 struct RayPayload {
     vec3 color;
@@ -72,7 +67,9 @@ struct UniformParams {
 	float camFar;
 	float camFov;
 };
-
+struct UniformMesh {
+	vec3 color;
+};
 
 // shaders helper functions
 vec2 BaryLerp(vec2 a, vec2 b, vec2 c, vec3 barycentrics) {

@@ -160,7 +160,6 @@ void VulkanApp::InitializeSettings() {
     mSettings.resolutionY = 720;
     mSettings.surfaceFormat = VK_FORMAT_B8G8R8A8_UNORM;
     mSettings.enableValidation = false;
-    mSettings.enableVSync = true;
     mSettings.supportRaytracing = false;
     mSettings.supportDescriptorIndexing = false;
 
@@ -425,19 +424,19 @@ bool VulkanApp::InitializeSwapchain() {
 
     // trying to find best present mode for us
     VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
-    if (!mSettings.enableVSync) {
-        // if we don't want vsync - let's find best one
-        for (const VkPresentModeKHR mode : presentModes) {
-            if (mode == VK_PRESENT_MODE_MAILBOX_KHR) {
-                // this is the best one, so if we found it - just quit
-                presentMode = mode;
-                break;
-            } else if (mode == VK_PRESENT_MODE_IMMEDIATE_KHR) {
-                // we'll use this one if no mailbox supported
-                presentMode = mode;
-            }
+
+    // let's find best one
+    for (const VkPresentModeKHR mode : presentModes) {
+        if (mode == VK_PRESENT_MODE_MAILBOX_KHR) {
+            // this is the best one, so if we found it - just quit
+            presentMode = mode;
+            break;
+        } else if (mode == VK_PRESENT_MODE_IMMEDIATE_KHR) {
+            // we'll use this one if no mailbox supported
+            presentMode = mode;
         }
     }
+    
 
     VkSwapchainKHR prevSwapchain = mSwapchain;
 
@@ -598,7 +597,8 @@ void VulkanApp::FillCommandBuffers() {
                                     subresourceRange,
                                     0,
                                     VK_ACCESS_TRANSFER_WRITE_BIT,
-                                    VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+                                    VK_IMAGE_LAYOUT_UNDEFINED, 
+									VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
         vulkanhelpers::ImageBarrier(commandBuffer,
                                     mOffscreenImage.GetImage(),
@@ -614,6 +614,7 @@ void VulkanApp::FillCommandBuffers() {
         copyRegion.dstSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
         copyRegion.dstOffset = { 0, 0, 0 };
         copyRegion.extent = { mSettings.resolutionX, mSettings.resolutionY, 1 };
+
         vkCmdCopyImage(commandBuffer,
                        mOffscreenImage.GetImage(),
                        VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,

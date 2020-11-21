@@ -10,7 +10,6 @@ struct AppSettings {
     uint32_t    resolutionY;
     VkFormat    surfaceFormat;
     bool        enableValidation;
-    bool        enableVSync;
     bool        supportRaytracing;
     bool        supportDescriptorIndexing;
 };

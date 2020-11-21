@@ -16,6 +16,7 @@ struct RTMesh {
 	vulkanhelpers::Buffer       attribs;
 	vulkanhelpers::Buffer       indices;
 	vulkanhelpers::Buffer       faces;
+	vulkanhelpers::Buffer       infos;
 
 	RTAccelerationStructure     blas;
 };
@@ -24,7 +25,7 @@ struct RTScene {
 	RTAccelerationStructure         topLevelAS;
 
 	// shader resources stuff
-	//Array<VkDescriptorBufferInfo>   matIDsBufferInfos;
+	Array<VkDescriptorBufferInfo>   meshInfoBufferInfos;
 	Array<VkDescriptorBufferInfo>   attribsBufferInfos;
 	Array<VkDescriptorBufferInfo>   facesBufferInfos;
 	//Array<VkDescriptorImageInfo>    texturesInfos;
@@ -79,8 +80,10 @@ public:
 protected:
     virtual void InitSettings() override;
     virtual void InitApp() override;
+	void updateUniformParams();
     virtual void FreeResources() override;
     virtual void FillCommandBuffer(VkCommandBuffer commandBuffer, const size_t imageIndex) override;
+	void OnKey(const int key, const int scancode, const int action, const int mods);
 	void Update(const size_t, const float dt);
 private:
     bool CreateAS(const VkAccelerationStructureTypeKHR type,
@@ -89,7 +92,6 @@ private:
                   const uint32_t instanceCount,
                   RTAccelerationStructure& _as);
 	void CreateCamera();
-	void LoadSceneGeometry2();
 	void LoadSceneGeometry();
     void CreateScene();
     void CreateDescriptorSetsLayouts();
@@ -101,8 +103,6 @@ private:
 	VkPipelineLayout                mRTPipelineLayout;
 
     VkDescriptorPool                mRTDescriptorPool;
-    //VkDescriptorSet          mRTDescriptorSet;
-	//VkDescriptorSetLayout    mRTDescriptorSetsLayout;
 	Array<VkDescriptorSet>          mRTDescriptorSets;
 	Array<VkDescriptorSetLayout>    mRTDescriptorSetsLayouts;
     SBTHelper                       mSBT;
@@ -126,12 +126,16 @@ private:
 		, mFov(45.0f)
 		, mNear(0.1f)
 		, mFar(100.0f)
-		, mPosition(-1.0f, 2.5f, 7.0f) 
+		, mPosition(-5.0f, 3.0f, 10.0f) 
     {
 		mLookAtPostion = mPosition + vec3(0, 0, -1);
 		mDirection = glm::normalize(mLookAtPostion - mPosition);
 	}
 };
+
 	Camera                          mCamera;
 	vulkanhelpers::Buffer           mCameraBuffer;
+	vec2 moveDelta;
+	bool moveCamera = false;
+	float sMoveSpeed = 0.5;
 };

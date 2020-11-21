@@ -13,6 +13,29 @@ layout(set = SWS_CAMDATA_SET, binding = SWS_CAMDATA_BINDING, std140)     uniform
 
 layout(location = SWS_LOC_PRIMARY_RAY) rayPayloadEXT RayPayload PrimaryRay;
 
+vec3 computeDiffuse( vec3 lightDir, vec3 normal, vec3 kd, vec3 ka)
+{
+	// Lambertian
+	float dotNL = max(dot(normal, lightDir), 0.0);
+	vec3  c = kd * dotNL;
+	c += ka;
+
+	return c;
+}
+
+vec3 computeSpecular(vec3 viewDir, vec3 lightDir, vec3 normal,vec3 ks,float shininess)
+{
+	const float kPi = 3.14159265;
+	const float kShininess = max(shininess, 4.0);
+
+	// Specular
+	const float kEnergyConservation = (2.0 + kShininess) / (2.0 * kPi);
+	vec3        V = normalize(-viewDir);
+	vec3        R = reflect(-lightDir, normal);
+	float       specular = kEnergyConservation * pow(max(dot(V, R), 0.0), kShininess);
+
+	return vec3(ks * specular);
+}
 
 vec3 CalcRayDir(vec2 pixel, float aspect) {
 
@@ -46,7 +69,6 @@ void main() {
 	const float tmax = Params.camFar;
 
 	vec3 finalColor = vec3(0.0f);
-	//for (int i = 0; i < SWS_MAX_RECURSION; ++i) {
 		traceRayEXT(Scene,
 			rayFlags,
 			cullMask,
@@ -63,22 +85,19 @@ void main() {
 		const float hitDistance = PrimaryRay.dist;
 		
 		if (hitDistance < 0.0f) {// if hit background - quit
-			finalColor += hitColor;
-			//break;
+			finalColor = hitColor;
 		}
 		else {
 			const vec3 hitNormal = PrimaryRay.normal;
 			const vec3 hitPos = origin + direction * hitDistance;
-			// Point light
-			const vec3 toLight = normalize(Params.lightPos-vec3(0));
-			float dotNL = max(dot(hitNormal, toLight), 0.2);
-			finalColor = hitColor * dotNL;
+			const vec3 lightDir = normalize(Params.lightPos - vec3(0));
+
+			
+			vec3  diffuse = computeDiffuse(lightDir, hitNormal, vec3(0.2, 0.2, 0.2), hitColor);
+			vec3  specular = computeSpecular(direction, lightDir, hitNormal, vec3(0.2, 0.2, 0.2), 50.0);
+			
+			finalColor = diffuse + specular;
 		}
-	//}
 
-	imageStore(ResultImage, ivec2(gl_LaunchIDEXT.xy), vec4(LinearToSrgb(finalColor), 1.0f));
+	imageStore(ResultImage, ivec2(gl_LaunchIDEXT.xy), vec4((finalColor), 1.0f));
 }
-
-
-/*
-*/

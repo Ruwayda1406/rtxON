@@ -13,6 +13,10 @@ layout(set = SWS_FACES_SET, binding = 0, std430) readonly buffer FacesBuffer {
 	uvec4 Faces[];
 } FacesArray[];
 
+layout(set = SWS_MESHINFO_SET, binding = 0, std430) readonly buffer meshInfoBuffer {
+	vec4 info;
+} meshInfoArray[];
+
 layout(location = SWS_LOC_PRIMARY_RAY) rayPayloadInEXT RayPayload PrimaryRay;
 
 hitAttributeEXT vec2 HitAttribs;
@@ -42,11 +46,15 @@ void main() {
 	// Transforming the position to world space
 	//worldPos = vec3(scnDesc.i[gl_InstanceID].transfo * vec4(worldPos, 1.0));
 
-	const vec3 texel = vec3(0.5, 0.5, 0.5);
-	PrimaryRay.color = texel;
+	PrimaryRay.objId = int(objId);
+	//if(PrimaryRay.objId == 1)//OBJECT_ID_PLANE
+	PrimaryRay.color = meshInfoArray[objId].info.xyz;
+	//else if(PrimaryRay.objId == 0)//OBJECT_ID_BUNNY 
+	//PrimaryRay.color = vec3(0.5, 0.0, 0.0);
+
 	PrimaryRay.normal = normal;
 	PrimaryRay.dist = gl_HitTEXT;
-	PrimaryRay.objId = int(objId);
+	
 	//PrimaryRay.hitValue = vec3(lightIntensity * (diffuse + specular));
 }
 
