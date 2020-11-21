@@ -262,7 +262,7 @@ void RtxApp::LoadSceneGeometry() {
 
 			const size_t positionsBufferSize = numVertices * sizeof(vec3);
 			const size_t indicesBufferSize = numFaces * 3 * sizeof(uint32_t);
-			const size_t facesBufferSize = numFaces * sizeof(ivec3);
+			const size_t facesBufferSize = numFaces * 4 * sizeof(uint32_t);
 			const size_t attribsBufferSize = numVertices * sizeof(VertexAttribute);
 
 			VkResult error = mesh.positions.Create(positionsBufferSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_RAY_TRACING_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
@@ -280,7 +280,7 @@ void RtxApp::LoadSceneGeometry() {
 			vec3* positions = reinterpret_cast<vec3*>(mesh.positions.Map());
 			VertexAttribute* attribs = reinterpret_cast<VertexAttribute*>(mesh.attribs.Map());
 			uint32_t* indices = reinterpret_cast<uint32_t*>(mesh.indices.Map());
-			ivec3* faces = reinterpret_cast<ivec3*>(mesh.faces.Map());
+			uint32_t* faces = reinterpret_cast<uint32_t*>(mesh.faces.Map());
 
 			size_t vIdx = 0;
 			for (size_t f = 0; f < numFaces; ++f) {
@@ -309,12 +309,15 @@ void RtxApp::LoadSceneGeometry() {
 				indices[b] = b;
 				indices[c] = c;
 
-				faces[f] = ivec3(a,b,c);
+				faces[4 * f + 0] = a;
+				faces[4 * f + 1] = b;
+				faces[4 * f + 2] = c;
 			}
 
 			mesh.indices.Unmap();
 			mesh.attribs.Unmap();
 			mesh.positions.Unmap();
+			mesh.faces.Unmap();
 		}
 	}
 

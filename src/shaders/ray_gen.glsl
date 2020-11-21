@@ -69,12 +69,9 @@ void main() {
 		else {
 			const vec3 hitNormal = PrimaryRay.normal;
 			const vec3 hitPos = origin + direction * hitDistance;
-			vec3  L;
-			float lightIntensity = 1.0;
-			float lightDistance = 100000.0;
 			// Point light
-			L = normalize(Params.lightPos - vec3(0));
-			float dotNL = max(dot(hitNormal, L), 0.2);
+			const vec3 toLight = normalize(Params.lightPos-vec3(0));
+			float dotNL = max(dot(hitNormal, toLight), 0.2);
 			finalColor = hitColor * dotNL;
 		}
 	//}

@@ -10,7 +10,7 @@ layout(set = SWS_ATTRIBS_SET, binding = 0, std430) readonly buffer AttribsBuffer
 } AttribsArray[];
 
 layout(set = SWS_FACES_SET, binding = 0, std430) readonly buffer FacesBuffer {
-	ivec3 Faces[];
+	uvec4 Faces[];
 } FacesArray[];
 
 layout(location = SWS_LOC_PRIMARY_RAY) rayPayloadInEXT RayPayload PrimaryRay;
@@ -23,12 +23,11 @@ void main() {
 	const uint objId = gl_InstanceCustomIndexEXT;// scnDesc.i[gl_InstanceID].objId;
 
 	// Indices of the triangle
-	const ivec3 face = FacesArray[nonuniformEXT(objId)].Faces[gl_PrimitiveID];
+	const uvec4 face = FacesArray[nonuniformEXT(gl_InstanceCustomIndexEXT)].Faces[gl_PrimitiveID];
 
-	// Vertex of the triangle
-	VertexAttribute v0 = AttribsArray[nonuniformEXT(objId)].VertexAttribs[face.x];
-	VertexAttribute v1 = AttribsArray[nonuniformEXT(objId)].VertexAttribs[face.y];
-	VertexAttribute v2 = AttribsArray[nonuniformEXT(objId)].VertexAttribs[face.z];
+	VertexAttribute v0 = AttribsArray[nonuniformEXT(gl_InstanceCustomIndexEXT)].VertexAttribs[int(face.x)];
+	VertexAttribute v1 = AttribsArray[nonuniformEXT(gl_InstanceCustomIndexEXT)].VertexAttribs[int(face.y)];
+	VertexAttribute v2 = AttribsArray[nonuniformEXT(gl_InstanceCustomIndexEXT)].VertexAttribs[int(face.z)];
 
 	const vec3 barycentrics = vec3(1.0f - HitAttribs.x - HitAttribs.y, HitAttribs.x, HitAttribs.y);
 
