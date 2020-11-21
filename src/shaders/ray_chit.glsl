@@ -3,7 +3,7 @@
 #extension GL_GOOGLE_include_directive : require
 #extension GL_EXT_nonuniform_qualifier : require
 
-#include "../shared_with_shaders.h"
+#include "../shared.h"
 
 layout(set = SWS_ATTRIBS_SET, binding = 0, std430) readonly buffer AttribsBuffer {
 	VertexAttribute VertexAttribs[];
@@ -42,7 +42,7 @@ void main() {
 	// Transforming the position to world space
 	//worldPos = vec3(scnDesc.i[gl_InstanceID].transfo * vec4(worldPos, 1.0));
 
-	const vec3 texel = vec3(1, 0, 0);
+	const vec3 texel = vec3(0.5, 0.5, 0.5);
 	PrimaryRay.color = texel;
 	PrimaryRay.normal = normal;
 	PrimaryRay.dist = gl_HitTEXT;

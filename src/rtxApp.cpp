@@ -1,9 +1,8 @@
 #include "rtxApp.h"
 
-#include "shared_with_shaders.h"
+#include "shared.h"
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "tiny_obj_loader.h"
-#include "ObjLoader.h"
 
 static const String sShadersFolder = "_data/shaders/";
 static const String sScenesFolder = "_data/scenes/";
