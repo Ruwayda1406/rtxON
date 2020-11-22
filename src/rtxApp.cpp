@@ -33,7 +33,7 @@ void RtxApp::InitSettings() {
 
 void RtxApp::InitApp() {
 
-	this->LoadSceneGeometry();
+	this->LoadSceneGeometries();
     this->CreateScene();
 	this->CreateCamera();
     this->CreateDescriptorSetsLayouts();
@@ -261,67 +261,40 @@ bool RtxApp::CreateAS(const VkAccelerationStructureTypeKHR type,
 	
     return true;
 }
-void RtxApp::LoadSceneGeometry2() {
+void RtxApp::LoadSceneGeometries() {
 
-	int maxNumber = 10;
-	for (size_t meshIdx = 0; meshIdx < maxNumber; ++meshIdx) {
-		RTMesh& mesh = mScene.meshes[meshIdx];
-
-		const size_t positionsBufferSize = sizeof(vec4);
-		const size_t meshInfosBufferSize = 2*sizeof(vec4);
-
-		VkResult error = mesh.positions.Create(positionsBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_RAY_TRACING_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-		CHECK_VK_ERROR(error, "mesh.attribs.Create");
-
-		error = mesh.infos.Create(meshInfosBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_RAY_TRACING_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-		CHECK_VK_ERROR(error, "mesh.infos.Create");
-
-		vec4* positions = reinterpret_cast<vec4*>(mesh.positions.Map());
-		vec4* infos = reinterpret_cast<vec4*>(mesh.infos.Map());
-
-		vec4& pos = positions[0];//random rgb color
-		pos.x = getRandomFloat(-5, 5);
-		pos.y = 0.0;
-		pos.z = getRandomFloat(-5, 5);
-		pos.w = getRandomFloat(0.1, 0.5);//radii
-
-		vec4& info = infos[0];//random rgb color
-		info.x = getRandomFloat(0.5, 0.8);
-		info.y = getRandomFloat(0.5, 0.8);
-		info.z = getRandomFloat(0.5, 0.8);
-		info.w = getRandomInt(0, 2);// 
-
-		mesh.positions.Unmap();
-		mesh.infos.Unmap();
-	}
+	mScene.meshes.clear();
+	LoadSceneGeometry(sScenesFolder + "fake_whitted.obj");
 
 	// prepare shader resources infos
 	const size_t numMeshes = mScene.meshes.size();
 	mScene.meshInfoBufferInfos.resize(numMeshes);
 	mScene.attribsBufferInfos.resize(numMeshes);
+	mScene.facesBufferInfos.resize(numMeshes);
 	for (size_t i = 0; i < numMeshes; ++i) {
-	const RTMesh& mesh = mScene.meshes[i];
-	VkDescriptorBufferInfo& meshInfo = mScene.meshInfoBufferInfos[i];
-	VkDescriptorBufferInfo& attribsInfo = mScene.attribsBufferInfos[i];
+		const RTMesh& mesh = mScene.meshes[i];
+		VkDescriptorBufferInfo& meshInfo = mScene.meshInfoBufferInfos[i];
+		VkDescriptorBufferInfo& attribsInfo = mScene.attribsBufferInfos[i];
+		VkDescriptorBufferInfo& facesInfo = mScene.facesBufferInfos[i];
 
-	attribsInfo.buffer = mesh.attribs.GetBuffer();
-	attribsInfo.offset = 0;
-	attribsInfo.range = mesh.attribs.GetSize();
+		attribsInfo.buffer = mesh.attribs.GetBuffer();
+		attribsInfo.offset = 0;
+		attribsInfo.range = mesh.attribs.GetSize();
 
-	meshInfo.buffer = mesh.infos.GetBuffer();
-	meshInfo.offset = 0;
-	meshInfo.range = mesh.infos.GetSize();
+		facesInfo.buffer = mesh.faces.GetBuffer();
+		facesInfo.offset = 0;
+		facesInfo.range = mesh.faces.GetSize();
+
+		meshInfo.buffer = mesh.infos.GetBuffer();
+		meshInfo.offset = 0;
+		meshInfo.range = mesh.infos.GetSize();
 	}
-
 }
-void RtxApp::LoadSceneGeometry() {
+void RtxApp::LoadSceneGeometry(String fileName) {
 	tinyobj::attrib_t attrib;
 	std::vector<tinyobj::shape_t> shapes;
 	std::vector<tinyobj::material_t> materials;
 	String warn, error;
-
-	String fileName = sScenesFolder + "fake_whitted.obj"; 
-//	String fileName = sScenesFolder + "cube.obj";
 
 	String baseDir = fileName;
 	const size_t slash = baseDir.find_last_of('/');
@@ -331,11 +304,13 @@ void RtxApp::LoadSceneGeometry() {
 
 	const bool result = tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &error, fileName.c_str(), baseDir.c_str(), true);
 	if (result) {
-		mScene.meshes.resize(shapes.size());
+		int currentMeshNumer = 0;// mScene.meshes.size();
+		mScene.meshes.resize(currentMeshNumer+shapes.size());
 
-		for (size_t meshIdx = 0; meshIdx < shapes.size(); ++meshIdx) {
-			RTMesh& mesh = mScene.meshes[meshIdx];
-			const tinyobj::shape_t& shape = shapes[meshIdx];
+		int meshIdx = currentMeshNumer;
+		for (size_t shapeIdx = 0; shapeIdx < shapes.size(); ++shapeIdx) {
+			RTMesh& mesh = mScene.meshes[meshIdx++];
+			const tinyobj::shape_t& shape = shapes[shapeIdx];
 
 			const size_t numFaces = shape.mesh.num_face_vertices.size();
 			const size_t numVertices = numFaces * 3;
@@ -402,11 +377,24 @@ void RtxApp::LoadSceneGeometry() {
 				faces[4 * f + 1] = b;
 				faces[4 * f + 2] = c;
 			}
+
 			vec4& info = infos[0];//random rgb color
-			info.x = getRandomFloat(0.5, 0.8);
-			info.y = getRandomFloat(0.5, 0.8);
-			info.z = getRandomFloat(0.5, 0.8);
-			info.w = getRandomInt(0, 2);// 
+			if (shape.name == "Plane")
+			{
+				info.x = 0.5;
+				info.y = 0.5;
+				info.z = 0.5;
+				info.w = 1.0;// alpha 
+			}
+			else
+			{
+				info.x = getRandomFloat(0.5, 1.0);
+				info.y = getRandomFloat(0.5, 1.0);
+				info.z = getRandomFloat(0.5, 1.0);
+				info.w = getRandomFloat(0.0, 1.0);// alpha 
+			}
+			
+			
 
 
 			mesh.indices.Unmap();
@@ -416,31 +404,6 @@ void RtxApp::LoadSceneGeometry() {
 			mesh.infos.Unmap();
 		}
 	}
-
-	// prepare shader resources infos
-	const size_t numMeshes = mScene.meshes.size();
-	mScene.meshInfoBufferInfos.resize(numMeshes);
-	mScene.attribsBufferInfos.resize(numMeshes);
-	mScene.facesBufferInfos.resize(numMeshes);
-	for (size_t i = 0; i < numMeshes; ++i) {
-		const RTMesh& mesh = mScene.meshes[i];
-		VkDescriptorBufferInfo& meshInfo = mScene.meshInfoBufferInfos[i];
-		VkDescriptorBufferInfo& attribsInfo = mScene.attribsBufferInfos[i];
-		VkDescriptorBufferInfo& facesInfo = mScene.facesBufferInfos[i];
-
-		attribsInfo.buffer = mesh.attribs.GetBuffer();
-		attribsInfo.offset = 0;
-		attribsInfo.range = mesh.attribs.GetSize();
-
-		facesInfo.buffer = mesh.faces.GetBuffer();
-		facesInfo.offset = 0;
-		facesInfo.range = mesh.faces.GetSize();
-
-		meshInfo.buffer = mesh.infos.GetBuffer();
-		meshInfo.offset = 0;
-		meshInfo.range = mesh.infos.GetSize();
-	}
-
 }
 void RtxApp::CreateScene() {
 	const VkTransformMatrixKHR transform = {
@@ -711,7 +674,7 @@ void RtxApp::CreateDescriptorSetsLayouts() {
 	ssboBinding.binding = 0;
 	ssboBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 	ssboBinding.descriptorCount = numMeshes;
-	ssboBinding.stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+	ssboBinding.stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR| VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
 	ssboBinding.pImmutableSamplers = nullptr;
 
 	VkDescriptorSetLayoutCreateInfo set1LayoutInfo;
@@ -751,26 +714,24 @@ void RtxApp::CreateRaytracingPipelineAndSBT() {
 	VkResult error = vkCreatePipelineLayout(mDevice, &pipelineLayoutCreateInfo, nullptr, &mRTPipelineLayout);
 	CHECK_VK_ERROR(error, "vkCreatePipelineLayout");
 
-    vulkanhelpers::Shader rayGenShader, rayChitShader, rayMissShader;
+    vulkanhelpers::Shader rayGenShader, rayChitShader, rayMissShader, rayAhitShader;
     rayGenShader.LoadFromFile((sShadersFolder + "ray_gen.bin").c_str());
     rayChitShader.LoadFromFile((sShadersFolder + "ray_chit.bin").c_str());
-    rayMissShader.LoadFromFile((sShadersFolder + "ray_miss.bin").c_str());
+  //  rayAhitShader.LoadFromFile((sShadersFolder + "ray_anyhit.bin").c_str());
+	rayMissShader.LoadFromFile((sShadersFolder + "ray_miss.bin").c_str());
 
     mSBT.Initialize(1, 1, mRTProps.shaderGroupHandleSize, mRTProps.shaderGroupBaseAlignment);
     mSBT.SetRaygenStage(rayGenShader.GetShaderStage(VK_SHADER_STAGE_RAYGEN_BIT_KHR));
-	mSBT.AddStageToHitGroup({ rayChitShader.GetShaderStage(VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR) }, SWS_PRIMARY_HIT_SHADERS_IDX);
+	mSBT.AddStageToHitGroup({ rayChitShader.GetShaderStage(VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR)
+		//,rayAhitShader.GetShaderStage(VK_SHADER_STAGE_ANY_HIT_BIT_KHR) 
+		}, SWS_PRIMARY_HIT_SHADERS_IDX);
 	mSBT.AddStageToMissGroup(rayMissShader.GetShaderStage(VK_SHADER_STAGE_MISS_BIT_KHR), SWS_PRIMARY_MISS_SHADERS_IDX);
 
-
-	// here are our groups map:
-	// group 0 : raygen
-	// group 1 : closest hit
-	// group 2 : miss
     VkRayTracingPipelineCreateInfoKHR rayPipelineInfo = {};
     rayPipelineInfo.sType = VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR;
     rayPipelineInfo.stageCount = mSBT.GetNumStages();
     rayPipelineInfo.pStages = mSBT.GetStages();
-    rayPipelineInfo.groupCount = mSBT.GetNumGroups();
+    rayPipelineInfo.groupCount = mSBT.GetNumGroups(); // 1-raygen, n-miss, n-(hit[+anyhit+intersect])
     rayPipelineInfo.pGroups = mSBT.GetGroups();
     rayPipelineInfo.maxRecursionDepth = 1;
     rayPipelineInfo.layout = mRTPipelineLayout;

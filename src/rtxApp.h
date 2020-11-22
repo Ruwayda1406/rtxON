@@ -91,10 +91,10 @@ private:
                   const VkAccelerationStructureCreateGeometryTypeInfoKHR* geometries,
                   const uint32_t instanceCount,
                   RTAccelerationStructure& _as);
-	void LoadSceneGeometry2();
+	void LoadSceneGeometries();
+	void LoadSceneGeometry(String fileName);
 	void CreateCamera();
-	void LoadSceneGeometry();
-    void CreateScene();
+	void CreateScene();
     void CreateDescriptorSetsLayouts();
     void CreateRaytracingPipelineAndSBT();
     void UpdateDescriptorSets();

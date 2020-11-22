@@ -62,7 +62,7 @@ void main() {
 
 	const uint rayFlags = gl_RayFlagsOpaqueEXT;
 	const uint cullMask = 0xFF;
-	const uint stbRecordStride = 1;
+	const uint hitProgramCount = 1;
 	const float tmin = 0.0f;
 	const float tmax = Camera.far;
 
@@ -71,7 +71,7 @@ void main() {
 			rayFlags,
 			cullMask,
 			SWS_PRIMARY_HIT_SHADERS_IDX,
-			stbRecordStride,
+			hitProgramCount,
 			SWS_PRIMARY_MISS_SHADERS_IDX,
 			origin,
 			tmin,
@@ -80,6 +80,7 @@ void main() {
 			SWS_LOC_PRIMARY_RAY);
 
 		const vec3 hitColor = PrimaryRay.color;
+		const float hitDistance = PrimaryRay.dist;
 		
 	imageStore(ResultImage, ivec2(gl_LaunchIDEXT.xy), vec4((hitColor), 1.0f));
 }

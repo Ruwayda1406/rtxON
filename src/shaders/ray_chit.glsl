@@ -72,20 +72,17 @@ void main() {
 	// Transforming the position to world space
 	//worldPos = vec3(scnDesc.i[gl_InstanceID].transfo * vec4(worldPos, 1.0));
 
-	if (meshInfoArray[objId].info.w == 1)
-	{
-		const vec3 hitPos = gl_WorldRayOriginEXT + gl_WorldRayDirectionEXT * gl_HitTEXT;
-		const vec3 lightDir = normalize(Params.lightPos - vec3(0));
-		const vec3 color = meshInfoArray[objId].info.xyz;
-		vec3  diffuse = computeDiffuse(lightDir, normal, vec3(0.2, 0.2, 0.2), color);
-		vec3  specular = computeSpecular(gl_WorldRayDirectionEXT, lightDir, normal, vec3(0.2, 0.2, 0.2), 50.0);
-		PrimaryRay.color = diffuse + specular;
-	}
-	else
-	{
-		PrimaryRay.color = vec3(1, 1, 1);
-	}
+	const vec3 hitPos = gl_WorldRayOriginEXT + gl_WorldRayDirectionEXT * gl_HitTEXT;
+	const vec3 lightDir = normalize(Params.lightPos - vec3(0));
+	const vec3 color = meshInfoArray[objId].info.xyz;
+	vec3  diffuse = computeDiffuse(lightDir, normal, vec3(0.2, 0.2, 0.2), color);
+	vec3  specular = computeSpecular(gl_WorldRayDirectionEXT, lightDir, normal, vec3(0.2, 0.2, 0.2), 50.0);
+	vec3 finalcolor = diffuse + specular;
 
-
+	PrimaryRay.color = finalcolor;
+	PrimaryRay.dist = gl_HitTEXT;
+	PrimaryRay.normal = normal;
+	PrimaryRay.matId = int(meshInfoArray[objId].info.w);
+	PrimaryRay.isHit = true;
 }
 

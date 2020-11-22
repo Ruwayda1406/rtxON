@@ -9,8 +9,6 @@
 //
 #define SWS_PRIMARY_HIT_SHADERS_IDX     0
 #define SWS_PRIMARY_MISS_SHADERS_IDX    0
-#define SWS_SHADOW_HIT_SHADERS_IDX      1
-#define SWS_SHADOW_MISS_SHADERS_IDX     1
 ///////////////////////////////////////////
 // resource locations
 #define SWS_SCENE_AS_SET                0
@@ -43,7 +41,8 @@ struct RayPayload {
     vec3 normal;
 	float dist;
 	int objId;
-
+	int matId;
+	bool isHit;
 };
 
 struct ShadowRayPayload {
@@ -95,5 +94,6 @@ float LinearToSrgb(float channel) {
 vec3 LinearToSrgb(vec3 linear) {
     return vec3(LinearToSrgb(linear.r), LinearToSrgb(linear.g), LinearToSrgb(linear.b));
 }
+
 
 #endif // SHARED_H
