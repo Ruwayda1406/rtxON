@@ -9,7 +9,7 @@ static const String sScenesFolder = "_data/scenes/";
 
 static vec3 lightPos = vec3(0.4f, 1.45f, 0.55f);
 static float sAmbientLight = 0.5f;
-static vec3 backgroundColor = vec3(1, 1, 1);
+static vec3 backgroundColor = vec3(0.8, 0.8, 0.8);
 
 RtxApp::RtxApp()
     : VulkanApp()
@@ -42,17 +42,24 @@ void RtxApp::InitApp() {
 }
 void RtxApp::updateUniformParams() {
 
-	UniformParams* params = reinterpret_cast<UniformParams*>(mCameraBuffer.Map());
+	// camera
+	CameraUniformParams* cameraParams = reinterpret_cast<CameraUniformParams*>(mCameraBuffer.Map());
+	
+	cameraParams->pos = vec4(mCamera.mPosition, 0.0f);
+	cameraParams->dir = vec4(mCamera.mDirection, 0.0f);
+	cameraParams->up = vec4(mCamera.Up, 0.0f);
+	cameraParams->side = vec4(vec3(mCamera.mView[0][0], mCamera.mView[1][0], mCamera.mView[2][0]), 0.0f);
+	cameraParams->far = mCamera.mFar;
+	cameraParams->fov = mCamera.mFov;
+	cameraParams->near = mCamera.mNear;
+	mCameraBuffer.Unmap();
+
+	//others
+	UniformParams* params = reinterpret_cast<UniformParams*>(mUniformParamsBuffer.Map());
+	params->clearColor = backgroundColor;
 	params->lightPos = lightPos;
 	params->sAmbientLight = sAmbientLight;
-	params->camPos = vec4(mCamera.mPosition, 0.0f);
-	params->camDir = vec4(mCamera.mDirection, 0.0f);
-	params->camUp = vec4(mCamera.Up, 0.0f);
-	params->camSide = vec4(vec3(mCamera.mView[0][0], mCamera.mView[1][0], mCamera.mView[2][0]), 0.0f);
-	params->camFar = mCamera.mFar;
-	params->camFov = mCamera.mFov;
-	params->camNear = mCamera.mNear;
-	mCameraBuffer.Unmap();
+	mUniformParamsBuffer.Unmap();
 }
 void RtxApp::FreeResources() {
 
@@ -175,7 +182,7 @@ void RtxApp::Update(const size_t, const float dt) {
 
 
 void RtxApp::CreateCamera() {
-	VkResult error = mCameraBuffer.Create(sizeof(UniformParams), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_RAY_TRACING_BIT_KHR, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+	VkResult error = mCameraBuffer.Create(sizeof(CameraUniformParams), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_RAY_TRACING_BIT_KHR, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 	CHECK_VK_ERROR(error, "mCameraBuffer.Create");
 
 	
@@ -185,6 +192,10 @@ void RtxApp::CreateCamera() {
 
 	mCamera.mProjection = glm::perspectiveRH_ZO<float>(Deg2Rad(mCamera.mFov), aspect, mCamera.mNear, mCamera.mFar);
 	mCamera.mView =  glm::lookAt(mCamera.mPosition, mCamera.mLookAtPostion, mCamera.Up);
+
+	/////////////////////////////////////////
+	error = mUniformParamsBuffer.Create(sizeof(UniformParams), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_RAY_TRACING_BIT_KHR, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+	CHECK_VK_ERROR(error, "mUniformParamsBuffer.Create");
 }
 bool RtxApp::CreateAS(const VkAccelerationStructureTypeKHR type,
                       const uint32_t geometryCount,
@@ -339,9 +350,9 @@ void RtxApp::LoadSceneGeometry() {
 				faces[4 * f + 2] = c;
 			}
 			vec4& info = infos[0];//random rgb color
-			info.x = 0.6;
-			info.y = 0.5;
-			info.z = getRandom(0.5, 1.0);
+			info.x = getRandom(0.5, 0.8);
+			info.y = getRandom(0.5, 0.8);
+			info.z = getRandom(0.5, 0.8);
 			info.w = meshIdx;
 
 
@@ -586,6 +597,7 @@ void RtxApp::CreateDescriptorSetsLayouts() {
     //  binding 0  ->  AS
     //  binding 1  ->  output image
 	//  binding 2  ->  Camera data
+	//  binding 3  ->  uniform data
 
     VkDescriptorSetLayoutBinding accelerationStructureLayoutBinding;
 	accelerationStructureLayoutBinding.binding =  SWS_SCENE_AS_BINDING;
@@ -605,13 +617,21 @@ void RtxApp::CreateDescriptorSetsLayouts() {
 	camdataBufferBinding.binding = SWS_CAMDATA_BINDING;
 	camdataBufferBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	camdataBufferBinding.descriptorCount = 1;
-	camdataBufferBinding.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+	camdataBufferBinding.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
 	camdataBufferBinding.pImmutableSamplers = nullptr;
+
+	VkDescriptorSetLayoutBinding uniformParamsBinding;
+	uniformParamsBinding.binding = SWS_UNIFORMPARAMS_BINDING;
+	uniformParamsBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	uniformParamsBinding.descriptorCount = 1;
+	uniformParamsBinding.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR| VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+	uniformParamsBinding.pImmutableSamplers = nullptr;
 
 	std::vector<VkDescriptorSetLayoutBinding> bindings({
 		accelerationStructureLayoutBinding,
 		resultImageLayoutBinding,
-		camdataBufferBinding
+		camdataBufferBinding,
+		uniformParamsBinding
 		});
 
     VkDescriptorSetLayoutCreateInfo layoutInfo;
@@ -665,6 +685,7 @@ void RtxApp::CreateDescriptorSetsLayouts() {
 
 	error = vkCreateDescriptorSetLayout(mDevice, &set1LayoutInfo, nullptr, &mRTDescriptorSetsLayouts[SWS_MESHINFO_SET]);
 	CHECK_VK_ERROR(error, L"vkCreateDescriptorSetLayout");
+
 
 }
 
@@ -848,6 +869,23 @@ void RtxApp::UpdateDescriptorSets() {
 	camdataBufferWrite.pImageInfo = nullptr;
 	camdataBufferWrite.pBufferInfo = &camdataBufferInfo;
 	camdataBufferWrite.pTexelBufferView = nullptr;
+	/////////////////////////////////////////////////////////// 
+	VkDescriptorBufferInfo uniformParamsBufferInfo;
+	uniformParamsBufferInfo.buffer = mUniformParamsBuffer.GetBuffer();
+	uniformParamsBufferInfo.offset = 0;
+	uniformParamsBufferInfo.range = mUniformParamsBuffer.GetSize();
+
+	VkWriteDescriptorSet uniformParamsBufferWrite;
+	uniformParamsBufferWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	uniformParamsBufferWrite.pNext = nullptr;
+	uniformParamsBufferWrite.dstSet = mRTDescriptorSets[SWS_UNIFORMPARAMS_SET];
+	uniformParamsBufferWrite.dstBinding = SWS_UNIFORMPARAMS_BINDING;
+	uniformParamsBufferWrite.dstArrayElement = 0;
+	uniformParamsBufferWrite.descriptorCount = 1;
+	uniformParamsBufferWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	uniformParamsBufferWrite.pImageInfo = nullptr;
+	uniformParamsBufferWrite.pBufferInfo = &uniformParamsBufferInfo;
+	uniformParamsBufferWrite.pTexelBufferView = nullptr;
 	///////////////////////////////////////////////////////////
 
     Array<VkWriteDescriptorSet> descriptorWrites({
@@ -861,6 +899,8 @@ void RtxApp::UpdateDescriptorSets() {
 	   meshInfoBufferWrite,
 	   //
 	   camdataBufferWrite,
+	   //
+	   uniformParamsBufferWrite,
     });
 
     vkUpdateDescriptorSets(mDevice, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, VK_NULL_HANDLE);

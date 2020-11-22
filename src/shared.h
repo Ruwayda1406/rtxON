@@ -11,30 +11,33 @@
 #define SWS_PRIMARY_MISS_SHADERS_IDX    0
 #define SWS_SHADOW_HIT_SHADERS_IDX      1
 #define SWS_SHADOW_MISS_SHADERS_IDX     1
-
+///////////////////////////////////////////
 // resource locations
 #define SWS_SCENE_AS_SET                0
 #define SWS_SCENE_AS_BINDING            0
+
 #define SWS_RESULT_IMAGE_SET            0
 #define SWS_RESULT_IMAGE_BINDING        1
+
 #define SWS_CAMDATA_SET                 0
 #define SWS_CAMDATA_BINDING             2
 
+#define SWS_UNIFORMPARAMS_SET           0
+#define SWS_UNIFORMPARAMS_BINDING       3
 
+//////////////////////////////////////////
 #define SWS_ATTRIBS_SET                 1
 #define SWS_FACES_SET                   2
 #define SWS_MESHINFO_SET                3
-#define SWS_TEXTURES_SET                4
 
 #define SWS_NUM_SETS                    4
-
+/////////////////////////////////////////
 // cross-shader locations
 #define SWS_LOC_PRIMARY_RAY             0
 #define SWS_LOC_HIT_ATTRIBS             1
 #define SWS_LOC_SHADOW_RAY              2
-
 #define SWS_MAX_RECURSION               10
-
+//////////////////////////////////////////
 struct RayPayload {
     vec3 color;
     vec3 normal;
@@ -53,22 +56,23 @@ struct VertexAttribute {
 };
 
 // packed std140
+struct CameraUniformParams {
+    
+    // Camera
+    vec4 pos;
+    vec4 dir;
+    vec4 up;
+    vec4 side;
+    float near;
+	float far;
+	float fov;
+};
 struct UniformParams {
-    // Lighting
-    vec3 lightPos;
+	vec3 clearColor;
+	// Lighting
+	vec3 lightPos;
 	float sAmbientLight;
 
-    // Camera
-    vec4 camPos;
-    vec4 camDir;
-    vec4 camUp;
-    vec4 camSide;
-    float camNear;
-	float camFar;
-	float camFov;
-};
-struct UniformMesh {
-	vec3 color;
 };
 
 // shaders helper functions

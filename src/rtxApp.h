@@ -138,4 +138,6 @@ private:
 	vec2 moveDelta;
 	bool moveCamera = false;
 	float sMoveSpeed = 0.5;
+
+	vulkanhelpers::Buffer mUniformParamsBuffer;
 };

@@ -7,7 +7,11 @@
 layout(set = SWS_SCENE_AS_SET, binding = SWS_SCENE_AS_BINDING)            uniform accelerationStructureEXT Scene;
 layout(set = SWS_RESULT_IMAGE_SET, binding = SWS_RESULT_IMAGE_BINDING, rgba8) uniform image2D ResultImage;
 
-layout(set = SWS_CAMDATA_SET, binding = SWS_CAMDATA_BINDING, std140)     uniform AppData{
+layout(set = SWS_CAMDATA_SET, binding = SWS_CAMDATA_BINDING, std140)     uniform CameraData{
+	CameraUniformParams Camera;
+};
+
+layout(set = SWS_UNIFORMPARAMS_SET, binding = SWS_UNIFORMPARAMS_BINDING, std140)     uniform AppData{
 	UniformParams Params;
 };
 
@@ -25,29 +29,23 @@ vec3 computeDiffuse( vec3 lightDir, vec3 normal, vec3 kd, vec3 ka)
 
 vec3 computeSpecular(vec3 viewDir, vec3 lightDir, vec3 normal,vec3 ks,float shininess)
 {
-	const float kPi = 3.14159265;
-	const float kShininess = max(shininess, 4.0);
-
-	// Specular
-	const float kEnergyConservation = (2.0 + kShininess) / (2.0 * kPi);
 	vec3        V = normalize(-viewDir);
 	vec3        R = reflect(-lightDir, normal);
-	float       specular = kEnergyConservation * pow(max(dot(V, R), 0.0), kShininess);
-
+	float       specular = pow(max(dot(V, R), 0.0), shininess);
 	return vec3(ks * specular);
 }
 
 vec3 CalcRayDir(vec2 pixel, float aspect) {
 
-	vec3 u = Params.camSide.xyz;
-	vec3 v = Params.camUp.xyz;
+	vec3 u = Camera.side.xyz;
+	vec3 v = Camera.up.xyz;
 
-	const float planeWidth = tan(Params.camFov* 0.5f);
+	const float planeWidth = tan(Camera.fov* 0.5f);
 
 	u *= (planeWidth * aspect);
 	v *= planeWidth;
 
-	const vec3 rayDir = normalize(Params.camDir.xyz + (u * pixel.x) - (v * pixel.y));
+	const vec3 rayDir = normalize(Camera.dir.xyz + (u * pixel.x) - (v * pixel.y));
 	return rayDir;
 }
 void main() {
@@ -58,7 +56,7 @@ void main() {
 
 	// Initialize a ray structure for our ray tracer
 	//ray origin
-	vec3 origin = Params.camPos.xyz;
+	vec3 origin = Camera.pos.xyz;
 	//ray direction;
 	vec3 direction = CalcRayDir(pixel, aspect);
 
@@ -66,7 +64,7 @@ void main() {
 	const uint cullMask = 0xFF;
 	const uint stbRecordStride = 1;
 	const float tmin = 0.0f;
-	const float tmax = Params.camFar;
+	const float tmax = Camera.far;
 
 	vec3 finalColor = vec3(0.0f);
 		traceRayEXT(Scene,
@@ -85,7 +83,7 @@ void main() {
 		const float hitDistance = PrimaryRay.dist;
 		
 		if (hitDistance < 0.0f) {// if hit background - quit
-			finalColor = hitColor;
+			finalColor = Params.clearColor;
 		}
 		else {
 			const vec3 hitNormal = PrimaryRay.normal;

@@ -19,7 +19,6 @@ String ToString(const T f, const int n = 6) {
     return out.str();
 }
 
-
 #pragma warning(push)
 #pragma warning(disable : 4201) // C4201: nonstandard extension used: nameless struct/union
 #define GLM_ENABLE_EXPERIMENTAL
@@ -51,7 +50,7 @@ inline float Rad2Deg(const float rad) {
 inline float Deg2Rad(const float deg) {
     return deg * (MM_Pi / 180.0f);
 }
-glm::vec3 inline getRandomVec3(int min, int max)
+glm::vec3 inline getRandomVec3(float min, float max)
 {
 	glm::vec3 r;
 	r.x = min + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (max - min)));
@@ -60,7 +59,7 @@ glm::vec3 inline getRandomVec3(int min, int max)
 
 	return r;
 }
-float inline getRandom(int min, int max)
+float inline getRandom(float min, float max)
 {
 	float r = min + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (max - min)));
 	return r;
