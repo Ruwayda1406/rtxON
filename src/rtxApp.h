@@ -91,6 +91,7 @@ private:
                   const VkAccelerationStructureCreateGeometryTypeInfoKHR* geometries,
                   const uint32_t instanceCount,
                   RTAccelerationStructure& _as);
+	void LoadSceneGeometry2();
 	void CreateCamera();
 	void LoadSceneGeometry();
     void CreateScene();

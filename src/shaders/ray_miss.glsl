@@ -5,12 +5,11 @@
 #include "../shared.h"
 
 layout(location = SWS_LOC_PRIMARY_RAY) rayPayloadInEXT RayPayload PrimaryRay;
+layout(set = SWS_UNIFORMPARAMS_SET, binding = SWS_UNIFORMPARAMS_BINDING, std140)     uniform AppData{
+	UniformParams Params;
+};
 
 void main() {
-	const vec3 backgroundColor = vec3(0.2f, 0.2f, 0.2f);
 
-	PrimaryRay.color = backgroundColor;
-	PrimaryRay.normal = vec3(0.0f);
-	PrimaryRay.dist = -1.0;
-	PrimaryRay.objId = 0;
+	PrimaryRay.color = Params.clearColor;
 }

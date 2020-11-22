@@ -59,9 +59,14 @@ glm::vec3 inline getRandomVec3(float min, float max)
 
 	return r;
 }
-float inline getRandom(float min, float max)
+float inline getRandomFloat(float min, float max)
 {
 	float r = min + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (max - min)));
+	return r;
+}
+int inline getRandomInt(int min, int max)
+{
+	int r = min + static_cast <int> (rand() % static_cast<int>(max - min + 1));
 	return r;
 }
 template <typename T>

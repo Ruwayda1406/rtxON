@@ -44,7 +44,6 @@ void RtxApp::updateUniformParams() {
 
 	// camera
 	CameraUniformParams* cameraParams = reinterpret_cast<CameraUniformParams*>(mCameraBuffer.Map());
-	
 	cameraParams->pos = vec4(mCamera.mPosition, 0.0f);
 	cameraParams->dir = vec4(mCamera.mDirection, 0.0f);
 	cameraParams->up = vec4(mCamera.Up, 0.0f);
@@ -59,6 +58,7 @@ void RtxApp::updateUniformParams() {
 	params->clearColor = backgroundColor;
 	params->lightPos = lightPos;
 	params->sAmbientLight = sAmbientLight;
+
 	mUniformParamsBuffer.Unmap();
 }
 void RtxApp::FreeResources() {
@@ -141,7 +141,7 @@ void RtxApp::FillCommandBuffer(VkCommandBuffer commandBuffer, const size_t image
 
 void RtxApp::OnKey(const int key, const int scancode, const int action, const int mods)
 {
-	if (GLFW_PRESS == action) {
+	/*if (GLFW_PRESS == action) {
 		switch (key) {
 		moveDelta=vec2(0.0f, 0.0f);
 		case GLFW_KEY_W: moveDelta.y += 1.0f; moveCamera =true; break;
@@ -158,7 +158,7 @@ void RtxApp::OnKey(const int key, const int scancode, const int action, const in
 		case GLFW_KEY_D: moveCamera = false; break;
 			break;
 		}
-	}
+	}*/
 }
 
 void RtxApp::Update(const size_t, const float dt) {
@@ -167,7 +167,7 @@ void RtxApp::Update(const size_t, const float dt) {
     String fullTitle = mSettings.name + "  " + frameStats;
     glfwSetWindowTitle(mWindow, fullTitle.c_str());
     /////////////////
-	if (moveCamera)
+	/*if (moveCamera)
 	{
 		moveDelta *= sMoveSpeed * dt;
 		vec3 cameraSide = normalize(cross(mCamera.mDirection, mCamera.Up));
@@ -175,7 +175,7 @@ void RtxApp::Update(const size_t, const float dt) {
 		mCamera.mPosition += cameraSide * moveDelta.x;
 		mCamera.mPosition += mCamera.mDirection * moveDelta.y;
 		mCamera.mView = glm::lookAt(mCamera.mPosition, mCamera.mLookAtPostion, mCamera.Up);
-	}
+	}*/
 
 	updateUniformParams();
 }
@@ -260,6 +260,59 @@ bool RtxApp::CreateAS(const VkAccelerationStructureTypeKHR type,
     _as.handle = vkGetAccelerationStructureDeviceAddressKHR(mDevice, &addressInfo);
 	
     return true;
+}
+void RtxApp::LoadSceneGeometry2() {
+
+	int maxNumber = 10;
+	for (size_t meshIdx = 0; meshIdx < maxNumber; ++meshIdx) {
+		RTMesh& mesh = mScene.meshes[meshIdx];
+
+		const size_t positionsBufferSize = sizeof(vec4);
+		const size_t meshInfosBufferSize = 2*sizeof(vec4);
+
+		VkResult error = mesh.positions.Create(positionsBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_RAY_TRACING_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+		CHECK_VK_ERROR(error, "mesh.attribs.Create");
+
+		error = mesh.infos.Create(meshInfosBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_RAY_TRACING_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+		CHECK_VK_ERROR(error, "mesh.infos.Create");
+
+		vec4* positions = reinterpret_cast<vec4*>(mesh.positions.Map());
+		vec4* infos = reinterpret_cast<vec4*>(mesh.infos.Map());
+
+		vec4& pos = positions[0];//random rgb color
+		pos.x = getRandomFloat(-5, 5);
+		pos.y = 0.0;
+		pos.z = getRandomFloat(-5, 5);
+		pos.w = getRandomFloat(0.1, 0.5);//radii
+
+		vec4& info = infos[0];//random rgb color
+		info.x = getRandomFloat(0.5, 0.8);
+		info.y = getRandomFloat(0.5, 0.8);
+		info.z = getRandomFloat(0.5, 0.8);
+		info.w = getRandomInt(0, 2);// 
+
+		mesh.positions.Unmap();
+		mesh.infos.Unmap();
+	}
+
+	// prepare shader resources infos
+	const size_t numMeshes = mScene.meshes.size();
+	mScene.meshInfoBufferInfos.resize(numMeshes);
+	mScene.attribsBufferInfos.resize(numMeshes);
+	for (size_t i = 0; i < numMeshes; ++i) {
+	const RTMesh& mesh = mScene.meshes[i];
+	VkDescriptorBufferInfo& meshInfo = mScene.meshInfoBufferInfos[i];
+	VkDescriptorBufferInfo& attribsInfo = mScene.attribsBufferInfos[i];
+
+	attribsInfo.buffer = mesh.attribs.GetBuffer();
+	attribsInfo.offset = 0;
+	attribsInfo.range = mesh.attribs.GetSize();
+
+	meshInfo.buffer = mesh.infos.GetBuffer();
+	meshInfo.offset = 0;
+	meshInfo.range = mesh.infos.GetSize();
+	}
+
 }
 void RtxApp::LoadSceneGeometry() {
 	tinyobj::attrib_t attrib;
@@ -350,10 +403,10 @@ void RtxApp::LoadSceneGeometry() {
 				faces[4 * f + 2] = c;
 			}
 			vec4& info = infos[0];//random rgb color
-			info.x = getRandom(0.5, 0.8);
-			info.y = getRandom(0.5, 0.8);
-			info.z = getRandom(0.5, 0.8);
-			info.w = meshIdx;
+			info.x = getRandomFloat(0.5, 0.8);
+			info.y = getRandomFloat(0.5, 0.8);
+			info.z = getRandomFloat(0.5, 0.8);
+			info.w = getRandomInt(0, 2);// 
 
 
 			mesh.indices.Unmap();
@@ -624,7 +677,7 @@ void RtxApp::CreateDescriptorSetsLayouts() {
 	uniformParamsBinding.binding = SWS_UNIFORMPARAMS_BINDING;
 	uniformParamsBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	uniformParamsBinding.descriptorCount = 1;
-	uniformParamsBinding.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR| VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+	uniformParamsBinding.stageFlags = VK_SHADER_STAGE_ALL;
 	uniformParamsBinding.pImmutableSamplers = nullptr;
 
 	std::vector<VkDescriptorSetLayoutBinding> bindings({

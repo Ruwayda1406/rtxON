@@ -17,10 +17,36 @@ layout(set = SWS_MESHINFO_SET, binding = 0, std430) readonly buffer meshInfoBuff
 	vec4 info;
 } meshInfoArray[];
 
+layout(set = SWS_CAMDATA_SET, binding = SWS_CAMDATA_BINDING, std140)     uniform CameraData{
+	CameraUniformParams Camera;
+};
+
+layout(set = SWS_UNIFORMPARAMS_SET, binding = SWS_UNIFORMPARAMS_BINDING, std140)     uniform AppData{
+	UniformParams Params;
+};
+
 layout(location = SWS_LOC_PRIMARY_RAY) rayPayloadInEXT RayPayload PrimaryRay;
 
 hitAttributeEXT vec2 HitAttribs;
 
+
+vec3 computeDiffuse(vec3 lightDir, vec3 normal, vec3 kd, vec3 ka)
+{
+	// Lambertian
+	float dotNL = max(dot(normal, lightDir), 0.0);
+	vec3  c = kd * dotNL;
+	c += ka;
+
+	return c;
+}
+
+vec3 computeSpecular(vec3 viewDir, vec3 lightDir, vec3 normal, vec3 ks, float shininess)
+{
+	vec3        V = normalize(-viewDir);
+	vec3        R = reflect(-lightDir, normal);
+	float       specular = pow(max(dot(V, R), 0.0), shininess);
+	return vec3(ks * specular);
+}
 void main() {
 	
 	// Object of this instance
@@ -46,15 +72,20 @@ void main() {
 	// Transforming the position to world space
 	//worldPos = vec3(scnDesc.i[gl_InstanceID].transfo * vec4(worldPos, 1.0));
 
-	PrimaryRay.objId = int(objId);
-	//if(PrimaryRay.objId == 1)//OBJECT_ID_PLANE
-	PrimaryRay.color = meshInfoArray[objId].info.xyz;
-	//else if(PrimaryRay.objId == 0)//OBJECT_ID_BUNNY 
-	//PrimaryRay.color = vec3(0.5, 0.0, 0.0);
+	if (meshInfoArray[objId].info.w == 1)
+	{
+		const vec3 hitPos = gl_WorldRayOriginEXT + gl_WorldRayDirectionEXT * gl_HitTEXT;
+		const vec3 lightDir = normalize(Params.lightPos - vec3(0));
+		const vec3 color = meshInfoArray[objId].info.xyz;
+		vec3  diffuse = computeDiffuse(lightDir, normal, vec3(0.2, 0.2, 0.2), color);
+		vec3  specular = computeSpecular(gl_WorldRayDirectionEXT, lightDir, normal, vec3(0.2, 0.2, 0.2), 50.0);
+		PrimaryRay.color = diffuse + specular;
+	}
+	else
+	{
+		PrimaryRay.color = vec3(1, 1, 1);
+	}
 
-	PrimaryRay.normal = normal;
-	PrimaryRay.dist = gl_HitTEXT;
-	
-	//PrimaryRay.hitValue = vec3(lightIntensity * (diffuse + specular));
+
 }
 

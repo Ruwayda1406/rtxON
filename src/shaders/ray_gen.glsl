@@ -80,22 +80,6 @@ void main() {
 			SWS_LOC_PRIMARY_RAY);
 
 		const vec3 hitColor = PrimaryRay.color;
-		const float hitDistance = PrimaryRay.dist;
 		
-		if (hitDistance < 0.0f) {// if hit background - quit
-			finalColor = Params.clearColor;
-		}
-		else {
-			const vec3 hitNormal = PrimaryRay.normal;
-			const vec3 hitPos = origin + direction * hitDistance;
-			const vec3 lightDir = normalize(Params.lightPos - vec3(0));
-
-			
-			vec3  diffuse = computeDiffuse(lightDir, hitNormal, vec3(0.2, 0.2, 0.2), hitColor);
-			vec3  specular = computeSpecular(direction, lightDir, hitNormal, vec3(0.2, 0.2, 0.2), 50.0);
-			
-			finalColor = diffuse + specular;
-		}
-
-	imageStore(ResultImage, ivec2(gl_LaunchIDEXT.xy), vec4((finalColor), 1.0f));
+	imageStore(ResultImage, ivec2(gl_LaunchIDEXT.xy), vec4((hitColor), 1.0f));
 }
