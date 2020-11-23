@@ -4,7 +4,7 @@
 #include <string>
 #include <sstream>
 #include <iomanip>
-
+#include <iomanip>
 template <typename T>
 using Array = std::vector<T>;
 

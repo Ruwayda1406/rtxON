@@ -2,6 +2,7 @@
 
 #include "framework/vulkanapp.h"
 
+#include "framework/camera.h"
 struct RTAccelerationStructure {
     VkDeviceMemory                          memory;
     VkAccelerationStructureCreateInfoKHR    accelerationStructureInfo;
@@ -70,31 +71,6 @@ private:
     Array<VkRayTracingShaderGroupCreateInfoKHR> mGroups;
     vulkanhelpers::Buffer                       mSBTBuffer;
 };
-class Camera
-{
-public:
-	Recti   mViewport;
-	float   mFov;
-	float   mNear;
-	float   mFar;
-	vec3    mPosition;
-	vec3    mLookAtPostion;
-	vec3    mDirection;
-
-	mat4    mProjection;
-	mat4    mView;
-	vec3    Up;
-
-	Camera() : Up(0.0f, 1.0f, 0.0f)
-		, mFov(45.0f)
-		, mNear(0.1f)
-		, mFar(100.0f)
-		, mPosition(-5.0f, 3.0f, 10.0f)
-	{
-		mLookAtPostion = mPosition + vec3(0, 0, -1);
-		mDirection = glm::normalize(mLookAtPostion - mPosition);
-	}
-};
 class Light
 {
 public:
@@ -112,7 +88,9 @@ protected:
 	void updateUniformParams(const float dt);
     virtual void FreeResources() override;
     virtual void FillCommandBuffer(VkCommandBuffer commandBuffer, const size_t imageIndex) override;
-	void OnKey(const int key, const int scancode, const int action, const int mods);
+	void OnKey(const int key, const int scancode, const int action, const int mods) override;
+	virtual void OnMouseMove(const float x, const float y) override;
+	virtual void OnMouseButton(const int button, const int action, const int mods) override;
 	void Update(const size_t, const float dt);
 private:
     bool CreateAS(const VkAccelerationStructureTypeKHR type,
@@ -141,12 +119,12 @@ private:
 	Light							mLight;
 	Camera                          mCamera;
 	vulkanhelpers::Buffer           mCameraBuffer;
+	vec2                            mCursorPos;
 	vec2 moveDelta;
-	bool moveCamera = false;
-	float sMoveSpeed = 0.5;
-	bool                            mWKeyDown;
-	bool                            mAKeyDown;
-	bool                            mSKeyDown;
-	bool                            mDKeyDown;
+
+	bool							mLMBDown;
+	float							sMoveSpeed = 0.5;
+	bool							mWKeyDown,mAKeyDown,mSKeyDown,mDKeyDown;
+	bool							mRightKeyDown, mLeftKeyDown, mDownKeyDown, mUpKeyDown;
 	vulkanhelpers::Buffer mUniformParamsBuffer;
 };

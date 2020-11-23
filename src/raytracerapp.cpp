@@ -12,16 +12,23 @@ static float sAmbientLight = 0.5f;
 static vec4 backgroundColor = vec4(0.7 , 0.8 , 1.0,1.0);
 static vec4 planeColor = vec4(0.7 , 0.8 , 0.5,1.0);
 static int mode = 0;
+static const float sMoveSpeed = 2.0f;
+static const float sRotateSpeed = 0.25f;
 
 RayTracerApp::RayTracerApp()
     : VulkanApp()
     , mRTPipelineLayout(VK_NULL_HANDLE)
     , mRTPipeline(VK_NULL_HANDLE)
     , mRTDescriptorPool(VK_NULL_HANDLE)
+	, mLMBDown(false)
 	, mWKeyDown(false)
 	, mAKeyDown(false)
 	, mSKeyDown(false)
 	, mDKeyDown(false)
+	, mRightKeyDown(false)
+	, mLeftKeyDown(false)
+	, mDownKeyDown(false)
+	, mUpKeyDown(false)
 {
 	
 
@@ -54,18 +61,38 @@ void RayTracerApp::updateUniformParams(const float dt) {
 	if (mSKeyDown) {
 		mLight.lightPos = mLight.lightPos - vec3(0.01, 0, 0);
 	}
+	if (mRightKeyDown || mLeftKeyDown || mDownKeyDown || mUpKeyDown){
+		moveDelta = vec2(0.0f, 0.0f);
+		if (mUpKeyDown)
+		{
+			moveDelta.y += 1.0f;
+		}
+		if (mUpKeyDown)
+		{
+			moveDelta.y -= 1.0f;
+		}
+		if (mRightKeyDown)
+		{
+			moveDelta.x += 1.0f;
+		}
+		if (mLeftKeyDown)
+		{
+			moveDelta.x -= 1.0f;
+		}
+		moveDelta *= sMoveSpeed * dt;
+		mCamera.Move(moveDelta.x, moveDelta.y);
+	}
 	//////////////////////////////////////////////////////////
-	// camera
+	// copy camera data to gpu
 	CameraUniformParams* cameraParams = reinterpret_cast<CameraUniformParams*>(mCameraBuffer.Map());
-	cameraParams->pos = vec4(mCamera.mPosition, 0.0f);
-	cameraParams->dir = vec4(mCamera.mDirection, 0.0f);
-	cameraParams->up = vec4(mCamera.Up, 0.0f);
-	cameraParams->side = vec4(vec3(mCamera.mView[0][0], mCamera.mView[1][0], mCamera.mView[2][0]), 0.0f);
-	cameraParams->nearFarFov = vec4(mCamera.mNear, mCamera.mFar, mCamera.mFov, 0.0);
-	cameraParams->lightPos = vec4(mLight.lightPos, 0.0f);
+	cameraParams->pos = vec4(mCamera.GetPosition(), 0.0f);
+	cameraParams->dir = vec4(mCamera.GetDirection(), 0.0f);
+	cameraParams->up = vec4(mCamera.GetUp(), 0.0f);
+	cameraParams->side = vec4(mCamera.GetSide(), 0.0f);
+	cameraParams->nearFarFov = vec4(mCamera.GetNearPlane(), mCamera.GetFarPlane(), Deg2Rad(mCamera.GetFovY()), 0.0f);
 	mCameraBuffer.Unmap();
 
-	//others
+	// copy others data to gpu
 	UniformParams* params = reinterpret_cast<UniformParams*>(mUniformParamsBuffer.Map());
 	params->clearColor = backgroundColor;
 	params->lightInfos = vec4(mLight.lightPos, sAmbientLight);
@@ -159,33 +186,44 @@ void RayTracerApp::OnKey(const int key, const int scancode, const int action, co
 		case GLFW_KEY_3: mode = 3; break;
 		case GLFW_KEY_W: mWKeyDown = false; break;
 		case GLFW_KEY_S: mSKeyDown = false; break;
+		case GLFW_KEY_RIGHT: mRightKeyDown = false; break;
+		case GLFW_KEY_LEFT: mLeftKeyDown = false; break;
+		case GLFW_KEY_DOWN: mDownKeyDown = false; break;
+		case GLFW_KEY_UP: mUpKeyDown = false; break;
+
 		}
 	}
 	else if (GLFW_PRESS == action) {
 		switch (key) {
 		case GLFW_KEY_W: mWKeyDown = true; break;
 		case GLFW_KEY_S: mSKeyDown = true; break;
-			
+		case GLFW_KEY_RIGHT: mRightKeyDown = true; break;
+		case GLFW_KEY_LEFT: mLeftKeyDown = true; break;
+		case GLFW_KEY_DOWN: mDownKeyDown = true; break;
+		case GLFW_KEY_UP: mUpKeyDown = true; break;
 		}
 	}
-	/*if (GLFW_PRESS == action) {
-		switch (key) {
-		moveDelta=vec2(0.0f, 0.0f);
-		case GLFW_KEY_W: moveDelta.y += 1.0f; moveCamera =true; break;
-		case GLFW_KEY_A: moveDelta.x -= 1.0f; moveCamera = true; break;
-		case GLFW_KEY_S: moveDelta.y -= 1.0f; moveCamera = true; break;
-		case GLFW_KEY_D: moveDelta.x += 1.0f; moveCamera = true; break;
-		}
+
+}
+
+void RayTracerApp::OnMouseMove(const float x, const float y) {
+	vec2 newPos(x, y);
+	vec2 delta = mCursorPos - newPos;
+
+	if (mLMBDown) {
+		mCamera.Rotate(delta.x * sRotateSpeed, delta.y * sRotateSpeed);
 	}
-	else if (GLFW_RELEASE == action) {
-		switch (key) {
-		case GLFW_KEY_W: 
-		case GLFW_KEY_A: 
-		case GLFW_KEY_S:
-		case GLFW_KEY_D: moveCamera = false; break;
-			break;
-		}
-	}*/
+
+	mCursorPos = newPos;
+}
+
+void RayTracerApp::OnMouseButton(const int button, const int action, const int mods) {
+	if (0 == button && GLFW_PRESS == action) {
+		mLMBDown = true;
+	}
+	else if (0 == button && GLFW_RELEASE == action) {
+		mLMBDown = false;
+	}
 }
 
 void RayTracerApp::Update(const size_t, const float dt) {
@@ -194,31 +232,18 @@ void RayTracerApp::Update(const size_t, const float dt) {
     String fullTitle = mSettings.name + "  " + frameStats;
     glfwSetWindowTitle(mWindow, fullTitle.c_str());
     /////////////////
-	/*if (moveCamera)
-	{
-		moveDelta *= sMoveSpeed * dt;
-		vec3 cameraSide = normalize(cross(mCamera.mDirection, mCamera.Up));
-
-		mCamera.mPosition += cameraSide * moveDelta.x;
-		mCamera.mPosition += mCamera.mDirection * moveDelta.y;
-		mCamera.mView = glm::lookAt(mCamera.mPosition, mCamera.mLookAtPostion, mCamera.Up);
-	}*/
-
 	this->updateUniformParams(dt);
 }
 
 
 void RayTracerApp::CreateCamera() {
-	VkResult error = mCameraBuffer.Create(sizeof(CameraUniformParams), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_RAY_TRACING_BIT_KHR, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+   VkResult error = mCameraBuffer.Create(sizeof(CameraUniformParams), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_RAY_TRACING_BIT_KHR, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 	CHECK_VK_ERROR(error, "mCameraBuffer.Create");
 
-	
-
-	Recti   mViewport = { 0, 0,static_cast<int>(mSettings.resolutionX)  , static_cast<int>(mSettings.resolutionY) };
-	const float aspect = static_cast<float>(mViewport.right - mViewport.left) / static_cast<float>(mViewport.bottom - mViewport.top);
-
-	mCamera.mProjection = glm::perspectiveRH_ZO<float>(Deg2Rad(mCamera.mFov), aspect, mCamera.mNear, mCamera.mFar);
-	mCamera.mView =  glm::lookAt(mCamera.mPosition, mCamera.mLookAtPostion, mCamera.Up);
+	mCamera.SetViewport({ 0, 0, static_cast<int>(mSettings.resolutionX), static_cast<int>(mSettings.resolutionY) });
+	mCamera.SetViewPlanes(0.1f, 100.0f);
+	mCamera.SetFovY(45.0f);
+	mCamera.LookAt(vec3(-5.0f, 3.0f, 10.0f), vec3(-5.0f, 3.0f, 9.0f));
 
 	/////////////////////////////////////////
 	error = mUniformParamsBuffer.Create(sizeof(UniformParams), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_RAY_TRACING_BIT_KHR, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);

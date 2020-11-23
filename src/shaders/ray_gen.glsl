@@ -68,6 +68,7 @@ void main() {
 		const vec2 pixel = uv / (gl_LaunchSizeEXT.xy - 1.0);
 		const float aspect = float(gl_LaunchSizeEXT.x) / float(gl_LaunchSizeEXT.y);
 
+
 		// Initialize a ray structure for our ray tracer
 		//ray origin
 		vec3 origin = Camera.pos.xyz;
