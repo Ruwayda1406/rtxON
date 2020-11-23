@@ -1,6 +1,5 @@
-#include "rtxApp.h"
-
+#include "raytracerapp.h"
 int main(int argc, const char** argv) {
-    RtxApp app;
+    RayTracerApp app;
     app.Run();
 }

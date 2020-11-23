@@ -1,4 +1,4 @@
-#include "rtxApp.h"
+#include "raytracerapp.h"
 
 #include "shared.h"
 #define TINYOBJLOADER_IMPLEMENTATION
@@ -11,7 +11,7 @@ static vec3 lightPos = vec3(0.4f, 1.45f, 0.55f);
 static float sAmbientLight = 0.5f;
 static vec3 backgroundColor = vec3(0.8, 0.8, 0.8);
 
-RtxApp::RtxApp()
+RayTracerApp::RayTracerApp()
     : VulkanApp()
     , mRTPipelineLayout(VK_NULL_HANDLE)
     , mRTPipeline(VK_NULL_HANDLE)
@@ -20,18 +20,18 @@ RtxApp::RtxApp()
 	
 
 }
-RtxApp::~RtxApp() {
+RayTracerApp::~RayTracerApp() {
 
 }
 
-void RtxApp::InitSettings() {
+void RayTracerApp::InitSettings() {
     mSettings.name = "rtxON";
     mSettings.enableValidation = true;
     mSettings.supportRaytracing = true;
     mSettings.supportDescriptorIndexing = true;
 }
 
-void RtxApp::InitApp() {
+void RayTracerApp::InitApp() {
 
 	this->LoadSceneGeometries();
     this->CreateScene();
@@ -40,7 +40,7 @@ void RtxApp::InitApp() {
     this->CreateRaytracingPipelineAndSBT();
     this->UpdateDescriptorSets();
 }
-void RtxApp::updateUniformParams() {
+void RayTracerApp::updateUniformParams() {
 
 	// camera
 	CameraUniformParams* cameraParams = reinterpret_cast<CameraUniformParams*>(mCameraBuffer.Map());
@@ -61,7 +61,7 @@ void RtxApp::updateUniformParams() {
 
 	mUniformParamsBuffer.Unmap();
 }
-void RtxApp::FreeResources() {
+void RayTracerApp::FreeResources() {
 
 	for (RTMesh& mesh : mScene.meshes) {
 		vkDestroyAccelerationStructureKHR(mDevice, mesh.blas.accelerationStructure, nullptr);
@@ -83,7 +83,7 @@ void RtxApp::FreeResources() {
         mRTDescriptorPool = VK_NULL_HANDLE;
     }
 
-    mSBT.Destroy();
+    mShaderBindingTable.Destroy();
 
     if (mRTPipeline) {
         vkDestroyPipeline(mDevice, mRTPipeline, nullptr);
@@ -102,7 +102,7 @@ void RtxApp::FreeResources() {
    
 }
 
-void RtxApp::FillCommandBuffer(VkCommandBuffer commandBuffer, const size_t imageIndex) {
+void RayTracerApp::FillCommandBuffer(VkCommandBuffer commandBuffer, const size_t imageIndex) {
     vkCmdBindPipeline(commandBuffer,
                       VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
                       mRTPipeline);
@@ -114,24 +114,24 @@ void RtxApp::FillCommandBuffer(VkCommandBuffer commandBuffer, const size_t image
 		0, 0);
 
     VkStridedBufferRegionKHR raygenSBT = {
-        mSBT.GetSBTBuffer(),
-        mSBT.GetRaygenOffset(),
-        mSBT.GetGroupsStride(),
-        mSBT.GetRaygenSize()
+        mShaderBindingTable.GetSBTBuffer(),
+        mShaderBindingTable.GetRaygenOffset(),
+        mShaderBindingTable.GetGroupsStride(),
+        mShaderBindingTable.GetRaygenSize()
     };
 
     VkStridedBufferRegionKHR hitSBT = {
-        mSBT.GetSBTBuffer(),
-        mSBT.GetHitGroupsOffset(),
-        mSBT.GetGroupsStride(),
-        mSBT.GetHitGroupsSize()
+        mShaderBindingTable.GetSBTBuffer(),
+        mShaderBindingTable.GetHitGroupsOffset(),
+        mShaderBindingTable.GetGroupsStride(),
+        mShaderBindingTable.GetHitGroupsSize()
     };
 
     VkStridedBufferRegionKHR missSBT = {
-        mSBT.GetSBTBuffer(),
-        mSBT.GetMissGroupsOffset(),
-        mSBT.GetGroupsStride(),
-        mSBT.GetMissGroupsSize()
+        mShaderBindingTable.GetSBTBuffer(),
+        mShaderBindingTable.GetMissGroupsOffset(),
+        mShaderBindingTable.GetGroupsStride(),
+        mShaderBindingTable.GetMissGroupsSize()
     };
 
     VkStridedBufferRegionKHR callableSBT = {};
@@ -139,7 +139,7 @@ void RtxApp::FillCommandBuffer(VkCommandBuffer commandBuffer, const size_t image
    vkCmdTraceRaysKHR(commandBuffer, &raygenSBT, &missSBT, &hitSBT, &callableSBT, mSettings.resolutionX, mSettings.resolutionY, 1u);
 }
 
-void RtxApp::OnKey(const int key, const int scancode, const int action, const int mods)
+void RayTracerApp::OnKey(const int key, const int scancode, const int action, const int mods)
 {
 	/*if (GLFW_PRESS == action) {
 		switch (key) {
@@ -161,7 +161,7 @@ void RtxApp::OnKey(const int key, const int scancode, const int action, const in
 	}*/
 }
 
-void RtxApp::Update(const size_t, const float dt) {
+void RayTracerApp::Update(const size_t, const float dt) {
     // Update FPS text
     String frameStats = ToString(mFPSMeter.GetFPS(), 1) + " FPS (" + ToString(mFPSMeter.GetFrameTime(), 1) + " ms)";
     String fullTitle = mSettings.name + "  " + frameStats;
@@ -181,7 +181,7 @@ void RtxApp::Update(const size_t, const float dt) {
 }
 
 
-void RtxApp::CreateCamera() {
+void RayTracerApp::CreateCamera() {
 	VkResult error = mCameraBuffer.Create(sizeof(CameraUniformParams), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_RAY_TRACING_BIT_KHR, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 	CHECK_VK_ERROR(error, "mCameraBuffer.Create");
 
@@ -197,7 +197,7 @@ void RtxApp::CreateCamera() {
 	error = mUniformParamsBuffer.Create(sizeof(UniformParams), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_RAY_TRACING_BIT_KHR, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 	CHECK_VK_ERROR(error, "mUniformParamsBuffer.Create");
 }
-bool RtxApp::CreateAS(const VkAccelerationStructureTypeKHR type,
+bool RayTracerApp::CreateAS(const VkAccelerationStructureTypeKHR type,
                       const uint32_t geometryCount,
                       const VkAccelerationStructureCreateGeometryTypeInfoKHR* geometries,
                       const uint32_t instanceCount,
@@ -261,7 +261,7 @@ bool RtxApp::CreateAS(const VkAccelerationStructureTypeKHR type,
 	
     return true;
 }
-void RtxApp::LoadSceneGeometries() {
+void RayTracerApp::LoadSceneGeometries() {
 
 	mScene.meshes.clear();
 	LoadSceneGeometry(sScenesFolder + "fake_whitted.obj");
@@ -290,7 +290,7 @@ void RtxApp::LoadSceneGeometries() {
 		meshInfo.range = mesh.infos.GetSize();
 	}
 }
-void RtxApp::LoadSceneGeometry(String fileName) {
+void RayTracerApp::LoadSceneGeometry(String fileName) {
 	tinyobj::attrib_t attrib;
 	std::vector<tinyobj::shape_t> shapes;
 	std::vector<tinyobj::material_t> materials;
@@ -405,7 +405,7 @@ void RtxApp::LoadSceneGeometry(String fileName) {
 		}
 	}
 }
-void RtxApp::CreateScene() {
+void RayTracerApp::CreateScene() {
 	const VkTransformMatrixKHR transform = {
 	1.0f, 0.0f, 0.0f, 0.0f,
 	0.0f, 1.0f, 0.0f, 0.0f,
@@ -606,7 +606,7 @@ void RtxApp::CreateScene() {
     vkFreeCommandBuffers(mDevice, mCommandPool, 1, &commandBuffer);
 }
 
-void RtxApp::CreateDescriptorSetsLayouts() {
+void RayTracerApp::CreateDescriptorSetsLayouts() {
 	const uint32_t numMeshes = static_cast<uint32_t>(mScene.meshes.size());
 	mRTDescriptorSetsLayouts.resize(SWS_NUM_SETS);
     // First set:
@@ -705,7 +705,7 @@ void RtxApp::CreateDescriptorSetsLayouts() {
 
 }
 
-void RtxApp::CreateRaytracingPipelineAndSBT() {
+void RayTracerApp::CreateRaytracingPipelineAndSBT() {
 	VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {};
 	pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 	pipelineLayoutCreateInfo.setLayoutCount = SWS_NUM_SETS;
@@ -714,25 +714,30 @@ void RtxApp::CreateRaytracingPipelineAndSBT() {
 	VkResult error = vkCreatePipelineLayout(mDevice, &pipelineLayoutCreateInfo, nullptr, &mRTPipelineLayout);
 	CHECK_VK_ERROR(error, "vkCreatePipelineLayout");
 
-    vulkanhelpers::Shader rayGenShader, rayChitShader, rayMissShader, rayAhitShader;
+	vulkanhelpers::Shader rayGenShader, rayChitShader, rayMissShader, rayAhitShader, shadowChit, shadowMiss;
     rayGenShader.LoadFromFile((sShadersFolder + "ray_gen.bin").c_str());
     rayChitShader.LoadFromFile((sShadersFolder + "ray_chit.bin").c_str());
   //  rayAhitShader.LoadFromFile((sShadersFolder + "ray_anyhit.bin").c_str());
 	rayMissShader.LoadFromFile((sShadersFolder + "ray_miss.bin").c_str());
+	shadowChit.LoadFromFile((sShadersFolder + "shadow_ray_chit.bin").c_str());
+	shadowMiss.LoadFromFile((sShadersFolder + "shadow_ray_miss.bin").c_str());
 
-    mSBT.Initialize(1, 1, mRTProps.shaderGroupHandleSize, mRTProps.shaderGroupBaseAlignment);
-    mSBT.SetRaygenStage(rayGenShader.GetShaderStage(VK_SHADER_STAGE_RAYGEN_BIT_KHR));
-	mSBT.AddStageToHitGroup({ rayChitShader.GetShaderStage(VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR)
+    mShaderBindingTable.Initialize(2,2, mRTProps.shaderGroupHandleSize, mRTProps.shaderGroupBaseAlignment);
+    mShaderBindingTable.SetRaygenStage(rayGenShader.GetShaderStage(VK_SHADER_STAGE_RAYGEN_BIT_KHR));
+	mShaderBindingTable.AddStageToHitGroup({ rayChitShader.GetShaderStage(VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR)
 		//,rayAhitShader.GetShaderStage(VK_SHADER_STAGE_ANY_HIT_BIT_KHR) 
 		}, SWS_PRIMARY_HIT_SHADERS_IDX);
-	mSBT.AddStageToMissGroup(rayMissShader.GetShaderStage(VK_SHADER_STAGE_MISS_BIT_KHR), SWS_PRIMARY_MISS_SHADERS_IDX);
+	mShaderBindingTable.AddStageToHitGroup({ shadowChit.GetShaderStage(VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR) }, SWS_SHADOW_HIT_SHADERS_IDX);
+
+	mShaderBindingTable.AddStageToMissGroup(rayMissShader.GetShaderStage(VK_SHADER_STAGE_MISS_BIT_KHR), SWS_PRIMARY_MISS_SHADERS_IDX);
+	mShaderBindingTable.AddStageToMissGroup(shadowMiss.GetShaderStage(VK_SHADER_STAGE_MISS_BIT_KHR), SWS_SHADOW_MISS_SHADERS_IDX);
 
     VkRayTracingPipelineCreateInfoKHR rayPipelineInfo = {};
     rayPipelineInfo.sType = VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR;
-    rayPipelineInfo.stageCount = mSBT.GetNumStages();
-    rayPipelineInfo.pStages = mSBT.GetStages();
-    rayPipelineInfo.groupCount = mSBT.GetNumGroups(); // 1-raygen, n-miss, n-(hit[+anyhit+intersect])
-    rayPipelineInfo.pGroups = mSBT.GetGroups();
+    rayPipelineInfo.stageCount = mShaderBindingTable.GetNumStages();
+    rayPipelineInfo.pStages = mShaderBindingTable.GetStages();
+    rayPipelineInfo.groupCount = mShaderBindingTable.GetNumGroups(); // 1-raygen, n-miss, n-(hit[+anyhit+intersect])
+    rayPipelineInfo.pGroups = mShaderBindingTable.GetGroups();
     rayPipelineInfo.maxRecursionDepth = 1;
     rayPipelineInfo.layout = mRTPipelineLayout;
     rayPipelineInfo.libraries.sType = VK_STRUCTURE_TYPE_PIPELINE_LIBRARY_CREATE_INFO_KHR;
@@ -740,10 +745,10 @@ void RtxApp::CreateRaytracingPipelineAndSBT() {
     error = vkCreateRayTracingPipelinesKHR(mDevice, VK_NULL_HANDLE, 1, &rayPipelineInfo, VK_NULL_HANDLE, &mRTPipeline);
     CHECK_VK_ERROR(error, "vkCreateRayTracingPipelinesKHR");
 
-    mSBT.CreateSBT(mDevice, mRTPipeline);
+    mShaderBindingTable.CreateSBT(mDevice, mRTPipeline);
 }
 
-void RtxApp::UpdateDescriptorSets() {
+void RayTracerApp::UpdateDescriptorSets() {
 	const uint32_t numMeshes = static_cast<uint32_t>(mScene.meshes.size());
     std::vector<VkDescriptorPoolSize> poolSizes({
         { VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 1 },       // top-level AS

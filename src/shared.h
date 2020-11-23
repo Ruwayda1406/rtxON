@@ -9,6 +9,8 @@
 //
 #define SWS_PRIMARY_HIT_SHADERS_IDX     0
 #define SWS_PRIMARY_MISS_SHADERS_IDX    0
+#define SWS_SHADOW_HIT_SHADERS_IDX      1
+#define SWS_SHADOW_MISS_SHADERS_IDX     1
 ///////////////////////////////////////////
 // resource locations
 #define SWS_SCENE_AS_SET                0
@@ -71,7 +73,7 @@ struct UniformParams {
 	// Lighting
 	vec3 lightPos;
 	float sAmbientLight;
-
+	int mode;
 };
 
 // shaders helper functions

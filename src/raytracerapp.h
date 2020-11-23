@@ -72,10 +72,10 @@ private:
 };
 
 
-class RtxApp : public VulkanApp {
+class RayTracerApp : public VulkanApp {
 public:
-    RtxApp();
-    ~RtxApp();
+    RayTracerApp();
+    ~RayTracerApp();
 
 protected:
     virtual void InitSettings() override;
@@ -106,7 +106,7 @@ private:
     VkDescriptorPool                mRTDescriptorPool;
 	Array<VkDescriptorSet>          mRTDescriptorSets;
 	Array<VkDescriptorSetLayout>    mRTDescriptorSetsLayouts;
-    SBTHelper                       mSBT;
+    SBTHelper                       mShaderBindingTable;
     RTScene                         mScene;
 	// camera 
 	struct Camera

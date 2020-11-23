@@ -16,6 +16,7 @@ layout(set = SWS_UNIFORMPARAMS_SET, binding = SWS_UNIFORMPARAMS_BINDING, std140)
 };
 
 layout(location = SWS_LOC_PRIMARY_RAY) rayPayloadEXT RayPayload PrimaryRay;
+layout(location = SWS_LOC_SHADOW_RAY)  rayPayloadEXT ShadowRayPayload ShadowRay;
 
 vec3 computeDiffuse( vec3 lightDir, vec3 normal, vec3 kd, vec3 ka)
 {
@@ -61,8 +62,10 @@ void main() {
 	vec3 direction = CalcRayDir(pixel, aspect);
 
 	const uint rayFlags = gl_RayFlagsOpaqueEXT;
+	const uint shadowRayFlags = gl_RayFlagsOpaqueEXT | gl_RayFlagsTerminateOnFirstHitEXT;
+
 	const uint cullMask = 0xFF;
-	const uint hitProgramCount = 1;
+	const uint stbRecordStride = 1;
 	const float tmin = 0.0f;
 	const float tmax = Camera.far;
 
@@ -71,7 +74,7 @@ void main() {
 			rayFlags,
 			cullMask,
 			SWS_PRIMARY_HIT_SHADERS_IDX,
-			hitProgramCount,
+			stbRecordStride,
 			SWS_PRIMARY_MISS_SHADERS_IDX,
 			origin,
 			tmin,
@@ -80,7 +83,45 @@ void main() {
 			SWS_LOC_PRIMARY_RAY);
 
 		const vec3 hitColor = PrimaryRay.color;
-		const float hitDistance = PrimaryRay.dist;
-		
-	imageStore(ResultImage, ivec2(gl_LaunchIDEXT.xy), vec4((hitColor), 1.0f));
+		if (PrimaryRay.isHit)
+		{
+			const vec3 hitNormal = PrimaryRay.normal;
+			const float hitDistance = PrimaryRay.dist;
+			const vec3 hitPos = origin + direction * hitDistance;
+
+			const vec3 toLight = normalize(Params.lightPos);
+			const vec3 shadowRayOrigin = hitPos + hitNormal * 0.001f;
+			finalColor = hitColor;
+
+			traceRayEXT(Scene,
+				shadowRayFlags,
+				cullMask,
+				SWS_SHADOW_HIT_SHADERS_IDX,
+				stbRecordStride,
+				SWS_SHADOW_MISS_SHADERS_IDX,
+				shadowRayOrigin,
+				0.0f,
+				toLight,
+				tmax,
+				SWS_LOC_SHADOW_RAY);
+
+			float lighting;
+			if (ShadowRay.distance > 0.0f)
+			{
+				lighting = Params.sAmbientLight;
+			}
+			else
+			{
+				lighting = max(Params.sAmbientLight, dot(hitNormal, toLight));
+			}
+
+			finalColor = hitColor * lighting;
+		}
+		else // hit background
+		{
+			finalColor = hitColor;
+		}
+
+
+	imageStore(ResultImage, ivec2(gl_LaunchIDEXT.xy), vec4(finalColor, 1.0f));
 }
