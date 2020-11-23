@@ -3,6 +3,7 @@
 #extension GL_GOOGLE_include_directive : require
 
 #include "../shared.h"
+#include "random.glsl"
 
 layout(set = SWS_SCENE_AS_SET, binding = SWS_SCENE_AS_BINDING)            uniform accelerationStructureEXT Scene;
 layout(set = SWS_RESULT_IMAGE_SET, binding = SWS_RESULT_IMAGE_BINDING, rgba8) uniform image2D ResultImage;
@@ -41,7 +42,7 @@ vec3 CalcRayDir(vec2 pixel, float aspect) {
 	vec3 u = Camera.side.xyz;
 	vec3 v = Camera.up.xyz;
 
-	const float planeWidth = tan(Camera.fov* 0.5f);
+	const float planeWidth = tan(Camera.nearFarFov.z* 0.5f);
 
 	u *= (planeWidth * aspect);
 	v *= planeWidth;
@@ -50,26 +51,38 @@ vec3 CalcRayDir(vec2 pixel, float aspect) {
 	return rayDir;
 }
 void main() {
-	//auto u = double(i) / (image_width - 1);
-	//auto v = double(j) / (image_height - 1);
-	const vec2 pixel = gl_LaunchIDEXT.xy / (gl_LaunchSizeEXT.xy - 1.0);
-	const float aspect = float(gl_LaunchSizeEXT.x) / float(gl_LaunchSizeEXT.y);
+	// Initialize the random number
+	uint seed = tea(gl_LaunchIDEXT.y * gl_LaunchSizeEXT.x + gl_LaunchIDEXT.x, int(Params.modeFrame.y));
+	vec3 hitValues = vec3(0);
 
-	// Initialize a ray structure for our ray tracer
-	//ray origin
-	vec3 origin = Camera.pos.xyz;
-	//ray direction;
-	vec3 direction = CalcRayDir(pixel, aspect);
+	int NBSAMPLES = 10;
+	for (int smpl = 0; smpl < NBSAMPLES; smpl++)
+	{
+		float r1 = rnd(seed);
+		float r2 = rnd(seed);
+		// Subpixel jitter: send the ray through a different position inside the pixel
+		// each time, to provide antialiasing.
+		vec2 subpixel_jitter = int(Params.modeFrame.y) == 0 ? vec2(0.5f, 0.5f) : vec2(r1, r2);
 
-	const uint rayFlags = gl_RayFlagsOpaqueEXT;
-	const uint shadowRayFlags = gl_RayFlagsOpaqueEXT | gl_RayFlagsTerminateOnFirstHitEXT;
+		const vec2 uv = vec2(gl_LaunchIDEXT.xy) + subpixel_jitter;
+		const vec2 pixel = uv / (gl_LaunchSizeEXT.xy - 1.0);
+		const float aspect = float(gl_LaunchSizeEXT.x) / float(gl_LaunchSizeEXT.y);
 
-	const uint cullMask = 0xFF;
-	const uint stbRecordStride = 1;
-	const float tmin = 0.0f;
-	const float tmax = Camera.far;
+		// Initialize a ray structure for our ray tracer
+		//ray origin
+		vec3 origin = Camera.pos.xyz;
+		//ray direction;
+		vec3 direction = CalcRayDir(pixel, aspect);
 
-	vec3 finalColor = vec3(0.0f);
+		const uint rayFlags = gl_RayFlagsOpaqueEXT;
+		const uint shadowRayFlags = gl_RayFlagsOpaqueEXT | gl_RayFlagsTerminateOnFirstHitEXT;
+
+		const uint cullMask = 0xFF;
+		const uint stbRecordStride = 1;
+		const float tmin = 0.001;
+		const float tmax = Camera.nearFarFov.y;
+
+		vec3 finalColor = vec3(0.0f);
 		traceRayEXT(Scene,
 			rayFlags,
 			cullMask,
@@ -89,7 +102,7 @@ void main() {
 			const float hitDistance = PrimaryRay.dist;
 			const vec3 hitPos = origin + direction * hitDistance;
 
-			const vec3 toLight = normalize(Params.lightPos);
+			const vec3 toLight = normalize(Params.lightInfos.xyz);
 			const vec3 shadowRayOrigin = hitPos + hitNormal * 0.001f;
 			finalColor = hitColor;
 
@@ -108,19 +121,21 @@ void main() {
 			float lighting;
 			if (ShadowRay.distance > 0.0f)
 			{
-				lighting = Params.sAmbientLight;
+				lighting = Params.lightInfos.w;
 			}
 			else
 			{
-				lighting = max(Params.sAmbientLight, dot(hitNormal, toLight));
+				lighting = max(Params.lightInfos.w, dot(hitNormal, toLight));
 			}
 
-			finalColor = hitColor * lighting;
+			hitValues += hitColor * lighting;
 		}
 		else // hit background
 		{
-			finalColor = hitColor;
+			hitValues += hitColor;// *seed;
 		}
+	}
+	vec3 finalColor = hitValues / NBSAMPLES;
 
 
 	imageStore(ResultImage, ivec2(gl_LaunchIDEXT.xy), vec4(finalColor, 1.0f));

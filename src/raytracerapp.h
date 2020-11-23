@@ -70,8 +70,37 @@ private:
     Array<VkRayTracingShaderGroupCreateInfoKHR> mGroups;
     vulkanhelpers::Buffer                       mSBTBuffer;
 };
+class Camera
+{
+public:
+	Recti   mViewport;
+	float   mFov;
+	float   mNear;
+	float   mFar;
+	vec3    mPosition;
+	vec3    mLookAtPostion;
+	vec3    mDirection;
 
+	mat4    mProjection;
+	mat4    mView;
+	vec3    Up;
 
+	Camera() : Up(0.0f, 1.0f, 0.0f)
+		, mFov(45.0f)
+		, mNear(0.1f)
+		, mFar(100.0f)
+		, mPosition(-5.0f, 3.0f, 10.0f)
+	{
+		mLookAtPostion = mPosition + vec3(0, 0, -1);
+		mDirection = glm::normalize(mLookAtPostion - mPosition);
+	}
+};
+class Light
+{
+public:
+	vec3 lightPos;//lightPosition
+	Light() : lightPos(vec3(0.4f, 1.45f, 0.55f)) {}
+};
 class RayTracerApp : public VulkanApp {
 public:
     RayTracerApp();
@@ -80,7 +109,7 @@ public:
 protected:
     virtual void InitSettings() override;
     virtual void InitApp() override;
-	void updateUniformParams();
+	void updateUniformParams(const float dt);
     virtual void FreeResources() override;
     virtual void FillCommandBuffer(VkCommandBuffer commandBuffer, const size_t imageIndex) override;
 	void OnKey(const int key, const int scancode, const int action, const int mods);
@@ -109,36 +138,15 @@ private:
     SBTHelper                       mShaderBindingTable;
     RTScene                         mScene;
 	// camera 
-	struct Camera
-{
-	Recti   mViewport;
-	float   mFov;
-	float   mNear;
-	float   mFar;
-	vec3    mPosition;
-	vec3    mLookAtPostion;
-	vec3    mDirection;
-
-	mat4    mProjection;
-	mat4    mView;
-	vec3    Up;
-
-	Camera() : Up(0.0f, 1.0f, 0.0f)
-		, mFov(45.0f)
-		, mNear(0.1f)
-		, mFar(100.0f)
-		, mPosition(-5.0f, 3.0f, 10.0f) 
-    {
-		mLookAtPostion = mPosition + vec3(0, 0, -1);
-		mDirection = glm::normalize(mLookAtPostion - mPosition);
-	}
-};
-
+	Light							mLight;
 	Camera                          mCamera;
 	vulkanhelpers::Buffer           mCameraBuffer;
 	vec2 moveDelta;
 	bool moveCamera = false;
 	float sMoveSpeed = 0.5;
-
+	bool                            mWKeyDown;
+	bool                            mAKeyDown;
+	bool                            mSKeyDown;
+	bool                            mDKeyDown;
 	vulkanhelpers::Buffer mUniformParamsBuffer;
 };

@@ -7,15 +7,21 @@
 static const String sShadersFolder = "_data/shaders/";
 static const String sScenesFolder = "_data/scenes/";
 
-static vec3 lightPos = vec3(0.4f, 1.45f, 0.55f);
+
 static float sAmbientLight = 0.5f;
-static vec3 backgroundColor = vec3(0.8, 0.8, 0.8);
+static vec4 backgroundColor = vec4(0.7 , 0.8 , 1.0,1.0);
+static vec4 planeColor = vec4(0.7 , 0.8 , 0.5,1.0);
+static int mode = 0;
 
 RayTracerApp::RayTracerApp()
     : VulkanApp()
     , mRTPipelineLayout(VK_NULL_HANDLE)
     , mRTPipeline(VK_NULL_HANDLE)
     , mRTDescriptorPool(VK_NULL_HANDLE)
+	, mWKeyDown(false)
+	, mAKeyDown(false)
+	, mSKeyDown(false)
+	, mDKeyDown(false)
 {
 	
 
@@ -40,25 +46,30 @@ void RayTracerApp::InitApp() {
     this->CreateRaytracingPipelineAndSBT();
     this->UpdateDescriptorSets();
 }
-void RayTracerApp::updateUniformParams() {
-
+void RayTracerApp::updateUniformParams(const float dt) {
+	// update values
+	if (mWKeyDown) {
+		mLight.lightPos = mLight.lightPos + vec3(0.01, 0, 0);
+	}
+	if (mSKeyDown) {
+		mLight.lightPos = mLight.lightPos - vec3(0.01, 0, 0);
+	}
+	//////////////////////////////////////////////////////////
 	// camera
 	CameraUniformParams* cameraParams = reinterpret_cast<CameraUniformParams*>(mCameraBuffer.Map());
 	cameraParams->pos = vec4(mCamera.mPosition, 0.0f);
 	cameraParams->dir = vec4(mCamera.mDirection, 0.0f);
 	cameraParams->up = vec4(mCamera.Up, 0.0f);
 	cameraParams->side = vec4(vec3(mCamera.mView[0][0], mCamera.mView[1][0], mCamera.mView[2][0]), 0.0f);
-	cameraParams->far = mCamera.mFar;
-	cameraParams->fov = mCamera.mFov;
-	cameraParams->near = mCamera.mNear;
+	cameraParams->nearFarFov = vec4(mCamera.mNear, mCamera.mFar, mCamera.mFov, 0.0);
+	cameraParams->lightPos = vec4(mLight.lightPos, 0.0f);
 	mCameraBuffer.Unmap();
 
 	//others
 	UniformParams* params = reinterpret_cast<UniformParams*>(mUniformParamsBuffer.Map());
 	params->clearColor = backgroundColor;
-	params->lightPos = lightPos;
-	params->sAmbientLight = sAmbientLight;
-
+	params->lightInfos = vec4(mLight.lightPos, sAmbientLight);
+	params->modeFrame= vec4(mode,floor(dt*10),0.0,0.0);
 	mUniformParamsBuffer.Unmap();
 }
 void RayTracerApp::FreeResources() {
@@ -141,6 +152,22 @@ void RayTracerApp::FillCommandBuffer(VkCommandBuffer commandBuffer, const size_t
 
 void RayTracerApp::OnKey(const int key, const int scancode, const int action, const int mods)
 {
+	if (GLFW_RELEASE == action) {
+		switch (key) {
+		case GLFW_KEY_1: mode = 1; break;
+		case GLFW_KEY_2: mode = 2; break;
+		case GLFW_KEY_3: mode = 3; break;
+		case GLFW_KEY_W: mWKeyDown = false; break;
+		case GLFW_KEY_S: mSKeyDown = false; break;
+		}
+	}
+	else if (GLFW_PRESS == action) {
+		switch (key) {
+		case GLFW_KEY_W: mWKeyDown = true; break;
+		case GLFW_KEY_S: mSKeyDown = true; break;
+			
+		}
+	}
 	/*if (GLFW_PRESS == action) {
 		switch (key) {
 		moveDelta=vec2(0.0f, 0.0f);
@@ -177,7 +204,7 @@ void RayTracerApp::Update(const size_t, const float dt) {
 		mCamera.mView = glm::lookAt(mCamera.mPosition, mCamera.mLookAtPostion, mCamera.Up);
 	}*/
 
-	updateUniformParams();
+	this->updateUniformParams(dt);
 }
 
 
@@ -208,7 +235,6 @@ bool RayTracerApp::CreateAS(const VkAccelerationStructureTypeKHR type,
     accelerationStructureInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR;
     accelerationStructureInfo.type = type;
     accelerationStructureInfo.flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR;
-	//accelerationStructureInfo.flags = 0;
     accelerationStructureInfo.maxGeometryCount = geometryCount;
     accelerationStructureInfo.pGeometryInfos = geometries;
 	accelerationStructureInfo.pNext = nullptr;
@@ -381,9 +407,9 @@ void RayTracerApp::LoadSceneGeometry(String fileName) {
 			vec4& info = infos[0];//random rgb color
 			if (shape.name == "Plane")
 			{
-				info.x = 0.5;
-				info.y = 0.5;
-				info.z = 0.5;
+				info.x = planeColor.r;
+				info.y = planeColor.g;
+				info.z = planeColor.b;
 				info.w = 1.0;// alpha 
 			}
 			else
@@ -633,7 +659,7 @@ void RayTracerApp::CreateDescriptorSetsLayouts() {
 	camdataBufferBinding.binding = SWS_CAMDATA_BINDING;
 	camdataBufferBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	camdataBufferBinding.descriptorCount = 1;
-	camdataBufferBinding.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+	camdataBufferBinding.stageFlags = VK_SHADER_STAGE_ALL;
 	camdataBufferBinding.pImmutableSamplers = nullptr;
 
 	VkDescriptorSetLayoutBinding uniformParamsBinding;
@@ -753,7 +779,7 @@ void RayTracerApp::UpdateDescriptorSets() {
     std::vector<VkDescriptorPoolSize> poolSizes({
         { VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 1 },       // top-level AS
         { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1 },                    // output image
-		 { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1 },                   // Camera data
+		 { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 2 },                   //  Camera uniform & general uniform
 	    { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, numMeshes * 3 },       // vertex attribs+faces+infos for each mesh
 																	
 		});
@@ -926,7 +952,7 @@ void RayTracerApp::UpdateDescriptorSets() {
 }
 
 
-// SBT Helper class
+///////////////////////////// SBT Helper class/////////////////////////////////////////////////
 
 static uint32_t AlignUp(const uint32_t value, const uint32_t align) {
     return (value + align - 1) & ~(align - 1);
@@ -1130,3 +1156,4 @@ VkBuffer SBTHelper::GetSBTBuffer() const {
     return mSBTBuffer.GetBuffer();
 }
 
+///////////////////////////// end SBTHelper ///////////////////////////////////////

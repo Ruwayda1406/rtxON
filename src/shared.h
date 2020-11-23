@@ -58,22 +58,19 @@ struct VertexAttribute {
 
 // packed std140
 struct CameraUniformParams {
-    
+	vec4 lightPos;//lightPosition
     // Camera
     vec4 pos;
     vec4 dir;
     vec4 up;
     vec4 side;
-    float near;
-	float far;
-	float fov;
+	vec4 nearFarFov;
 };
 struct UniformParams {
-	vec3 clearColor;
+	vec4 clearColor;
 	// Lighting
-	vec3 lightPos;
-	float sAmbientLight;
-	int mode;
+	vec4 lightInfos;
+	vec4 modeFrame;
 };
 
 // shaders helper functions
@@ -96,6 +93,9 @@ float LinearToSrgb(float channel) {
 vec3 LinearToSrgb(vec3 linear) {
     return vec3(LinearToSrgb(linear.r), LinearToSrgb(linear.g), LinearToSrgb(linear.b));
 }
+
+
+
 
 
 #endif // SHARED_H
