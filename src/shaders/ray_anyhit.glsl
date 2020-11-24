@@ -5,20 +5,21 @@
 #extension GL_GOOGLE_include_directive : enable
 #include "../shared.h"
 layout(location = SWS_LOC_PRIMARY_RAY) rayPayloadInEXT RayPayload PrimaryRay;
-/*layout(set = SWS_MESHINFO_SET, binding = 0, std430) readonly buffer meshInfoBuffer {
+layout(set = SWS_MESHINFO_SET, binding = 0, std430) readonly buffer meshInfoBuffer {
 	vec4 info[];
 } meshInfoArray[];
-*/
+
 
 void main() {
 	const uint objId = gl_InstanceCustomIndexEXT;
-	PrimaryRay.accColor = vec4(1,0,0,0);
 	// Is this a transparent part of the surface?  If so, ignore this hit
-	/*if (PrimaryRay.accAlpha < 1.0)
+	if (PrimaryRay.accColor.w < 1.0)
 	{
-		//float n = 1.0 - PrimaryRay.accAlpha;
-		float a = meshInfoArray[objId].info[0].w;
-		PrimaryRay.accAlpha += a;
-		PrimaryRay.accColor += meshInfoArray[objId].info[0].xyz*a;
-	}*/
+		// Front-to-back compositing
+		PrimaryRay.accColor = (1.0 - PrimaryRay.accColor.w) * meshInfoArray[objId].info[0] + PrimaryRay.accColor;
+		if (meshInfoArray[objId].info[0].w < 1.0)
+		{
+			ignoreIntersectionEXT();
+		}
+	}
 }

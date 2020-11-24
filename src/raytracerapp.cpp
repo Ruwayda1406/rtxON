@@ -458,7 +458,10 @@ void RayTracerApp::LoadSceneGeometry(String fileName) {
 				matInfo.z = 0.0;
 				if (shape.name == "Sphere")
 				{
-					colorInfo.w = 0.5;// alpha 
+					colorInfo.x = 1;
+					colorInfo.y = 0;
+					colorInfo.z = 0;
+					colorInfo.w = 0.9;// alpha 
 
 				}
 				else
