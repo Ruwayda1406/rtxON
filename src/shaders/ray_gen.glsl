@@ -17,25 +17,6 @@ layout(set = SWS_UNIFORMPARAMS_SET, binding = SWS_UNIFORMPARAMS_BINDING, std140)
 };
 
 layout(location = SWS_LOC_PRIMARY_RAY) rayPayloadEXT RayPayload PrimaryRay;
-layout(location = SWS_LOC_SHADOW_RAY)  rayPayloadEXT ShadowRayPayload ShadowRay;
-
-vec3 computeDiffuse( vec3 lightDir, vec3 normal, vec3 kd, vec3 ka)
-{
-	// Lambertian
-	float dotNL = max(dot(normal, lightDir), 0.0);
-	vec3  c = kd * dotNL;
-	c += ka;
-
-	return c;
-}
-
-vec3 computeSpecular(vec3 viewDir, vec3 lightDir, vec3 normal,vec3 ks,float shininess)
-{
-	vec3        V = normalize(-viewDir);
-	vec3        R = reflect(-lightDir, normal);
-	float       specular = pow(max(dot(V, R), 0.0), shininess);
-	return vec3(ks * specular);
-}
 
 vec3 CalcRayDir(vec2 pixel, float aspect) {
 
@@ -76,12 +57,12 @@ void main() {
 		vec3 direction = CalcRayDir(pixel, aspect);
 
 		const uint rayFlags = gl_RayFlagsOpaqueEXT;
-		const uint shadowRayFlags = gl_RayFlagsOpaqueEXT | gl_RayFlagsTerminateOnFirstHitEXT;
 
 		const uint cullMask = 0xFF;
 		const uint stbRecordStride = 1;
 		const float tmin = 0.001;
 		const float tmax = Camera.nearFarFov.y;
+
 
 		vec3 finalColor = vec3(0.0f);
 		traceRayEXT(Scene,
@@ -97,44 +78,7 @@ void main() {
 			SWS_LOC_PRIMARY_RAY);
 
 		const vec3 hitColor = PrimaryRay.color;
-		if (PrimaryRay.isHit)
-		{
-			const vec3 hitNormal = PrimaryRay.normal;
-			const float hitDistance = PrimaryRay.dist;
-			const vec3 hitPos = origin + direction * hitDistance;
-
-			const vec3 toLight = normalize(Params.lightInfos.xyz);
-			const vec3 shadowRayOrigin = hitPos + hitNormal * 0.001f;
-			finalColor = hitColor;
-
-			traceRayEXT(Scene,
-				shadowRayFlags,
-				cullMask,
-				SWS_SHADOW_HIT_SHADERS_IDX,
-				stbRecordStride,
-				SWS_SHADOW_MISS_SHADERS_IDX,
-				shadowRayOrigin,
-				0.0f,
-				toLight,
-				tmax,
-				SWS_LOC_SHADOW_RAY);
-
-			float lighting;
-			if (ShadowRay.distance > 0.0f)
-			{
-				lighting = Params.lightInfos.w;
-			}
-			else
-			{
-				lighting = max(Params.lightInfos.w, dot(hitNormal, toLight));
-			}
-
-			hitValues += hitColor * lighting;
-		}
-		else // hit background
-		{
-			hitValues += hitColor;// *seed;
-		}
+		hitValues += hitColor;
 	}
 	vec3 finalColor = hitValues / NBSAMPLES;
 

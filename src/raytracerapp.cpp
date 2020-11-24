@@ -670,7 +670,7 @@ void RayTracerApp::CreateDescriptorSetsLayouts() {
 	accelerationStructureLayoutBinding.binding =  SWS_SCENE_AS_BINDING;
     accelerationStructureLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
     accelerationStructureLayoutBinding.descriptorCount = 1;
-    accelerationStructureLayoutBinding.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+    accelerationStructureLayoutBinding.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR| VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
     accelerationStructureLayoutBinding.pImmutableSamplers = nullptr;
 
     VkDescriptorSetLayoutBinding resultImageLayoutBinding;
