@@ -48,7 +48,7 @@ struct RayPayload {
 };
 
 struct ShadowRayPayload {
-    float distance;
+	bool isShadowed;
 };
 
 struct VertexAttribute {

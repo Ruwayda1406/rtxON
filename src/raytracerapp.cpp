@@ -8,7 +8,7 @@ static const String sShadersFolder = "_data/shaders/";
 static const String sScenesFolder = "_data/scenes/";
 
 
-static float sAmbientLight = 0.5f;
+static float sAmbientLight = 0.55f;
 static vec4 backgroundColor = vec4(0.7 , 0.8 , 1.0,1.0);
 static vec4 planeColor = vec4(0.7 , 0.8 , 0.5,1.0);
 static int mode = 0;
@@ -62,24 +62,21 @@ void RayTracerApp::updateUniformParams(const float dt) {
 		mLight.lightPos = mLight.lightPos - vec3(0.01, 0, 0);
 	}
 	if (mRightKeyDown || mLeftKeyDown || mDownKeyDown || mUpKeyDown){
-		moveDelta = vec2(0.0f, 0.0f);
-		if (mUpKeyDown)
-		{
+		vec2 moveDelta(0.0f, 0.0f);
+		if (mUpKeyDown) {
 			moveDelta.y += 1.0f;
 		}
-		if (mUpKeyDown)
-		{
+		if (mDownKeyDown) {
 			moveDelta.y -= 1.0f;
 		}
-		if (mRightKeyDown)
-		{
-			moveDelta.x += 1.0f;
-		}
-		if (mLeftKeyDown)
-		{
+		if (mLeftKeyDown) {
 			moveDelta.x -= 1.0f;
 		}
-		moveDelta *= sMoveSpeed * dt;
+		if (mRightKeyDown) {
+			moveDelta.x += 1.0f;
+		}
+
+		moveDelta *= sMoveSpeed * dt ;
 		mCamera.Move(moveDelta.x, moveDelta.y);
 	}
 	//////////////////////////////////////////////////////////
@@ -185,7 +182,9 @@ void RayTracerApp::OnKey(const int key, const int scancode, const int action, co
 		case GLFW_KEY_2: mode = 2; break;
 		case GLFW_KEY_3: mode = 3; break;
 		case GLFW_KEY_W: mWKeyDown = false; break;
+		case GLFW_KEY_A: mAKeyDown = false; break;
 		case GLFW_KEY_S: mSKeyDown = false; break;
+		case GLFW_KEY_D: mDKeyDown = false; break;
 		case GLFW_KEY_RIGHT: mRightKeyDown = false; break;
 		case GLFW_KEY_LEFT: mLeftKeyDown = false; break;
 		case GLFW_KEY_DOWN: mDownKeyDown = false; break;
@@ -196,7 +195,9 @@ void RayTracerApp::OnKey(const int key, const int scancode, const int action, co
 	else if (GLFW_PRESS == action) {
 		switch (key) {
 		case GLFW_KEY_W: mWKeyDown = true; break;
+		case GLFW_KEY_A: mAKeyDown = true; break;
 		case GLFW_KEY_S: mSKeyDown = true; break;
+		case GLFW_KEY_D: mDKeyDown = true; break;
 		case GLFW_KEY_RIGHT: mRightKeyDown = true; break;
 		case GLFW_KEY_LEFT: mLeftKeyDown = true; break;
 		case GLFW_KEY_DOWN: mDownKeyDown = true; break;

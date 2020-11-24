@@ -4,6 +4,8 @@
 #extension GL_EXT_nonuniform_qualifier : require
 
 #include "../shared.h"
+#include "random.glsl"
+
 layout(set = SWS_SCENE_AS_SET, binding = SWS_SCENE_AS_BINDING)            uniform accelerationStructureEXT Scene;
 layout(set = SWS_ATTRIBS_SET, binding = 0, std430) readonly buffer AttribsBuffer {
 	VertexAttribute VertexAttribs[];
@@ -70,42 +72,60 @@ void main() {
 	const vec3 lightDir = normalize(Params.lightInfos.xyz - vec3(0));
 	const vec3 color = meshInfoArray[objId].info.xyz;
 	vec3  diffuse = computeDiffuse(lightDir, normal, vec3(0.2, 0.2, 0.2), color);
-	vec3  specular = computeSpecular(gl_WorldRayDirectionEXT, lightDir, normal, vec3(0.2, 0.2, 0.2), 50.0);
-	vec3 finalcolor = diffuse + specular;
+	
+	vec3  specular = vec3(0);
+	float attenuation = 1;
+	float lightDistance = 100000.0;
 
 	
-	const uint shadowRayFlags = gl_RayFlagsOpaqueEXT | gl_RayFlagsTerminateOnFirstHitEXT;
+	const uint shadowRayFlags = gl_RayFlagsOpaqueEXT | gl_RayFlagsTerminateOnFirstHitEXT| gl_RayFlagsSkipClosestHitShaderEXT;
 	const uint cullMask = 0xFF;
 	const uint stbRecordStride = 1;
 	const float tmin = 0.001;
-	const float tmax = Camera.nearFarFov.y;
+	const float tmax = lightDistance;
 
-	const vec3 toLight = normalize(Params.lightInfos.xyz);
-	const vec3 shadowRayOrigin = hitPos + normal * 0.001f;
+	// Initialize the random number
+	uint seed = tea(gl_LaunchIDEXT.y * gl_LaunchSizeEXT.x + gl_LaunchIDEXT.x, int(Params.modeFrame.y));
+	vec3 hitValues = vec3(0);
 
-	traceRayEXT(Scene,
-		shadowRayFlags,
-		cullMask,
-		SWS_SHADOW_HIT_SHADERS_IDX,
-		stbRecordStride,
-		SWS_SHADOW_MISS_SHADERS_IDX,
-		shadowRayOrigin,
-		0.0f,
-		toLight,
-		tmax,
-		SWS_LOC_SHADOW_RAY);
-
-	float lighting;
-	if (ShadowRay.distance > 0.0f)
+	int NBSAMPLES = 1;
+	for (int smpl = 0; smpl < NBSAMPLES; smpl++)
 	{
-		lighting = Params.lightInfos.w;
-	}
-	else
-	{
-		lighting = max(Params.lightInfos.w, dot(normal, toLight));
-	}
+		float r1 = rnd(seed);
+		float r2 = rnd(seed);
+		float r3 = rnd(seed);
+		// Subpixel jitter: send the ray through a different position inside the pixel
+		// each time, to provide antialiasing.
+		vec3 sublight_jitter = vec3(0.5f, 0.5f, 0.5f);// int(Params.modeFrame.y) == 0 ? vec3(0.5f, 0.5f, 0.5f) : vec3(r1, r2, r3);
+		const vec3 toLight = normalize(Params.lightInfos.xyz);// +sublight_jitter);
+		const vec3 shadowRayOrigin = hitPos + normal * 0.001f;
+		ShadowRay.isShadowed = true;
+		traceRayEXT(Scene,
+			shadowRayFlags,
+			cullMask,
+			0,
+			stbRecordStride,
+			SWS_SHADOW_MISS_SHADERS_IDX,
+			shadowRayOrigin,
+			0.0f,
+			toLight,
+			tmax,
+			SWS_LOC_SHADOW_RAY);
 
-	finalcolor = finalcolor * lighting;
+		float lighting;
+		if (ShadowRay.isShadowed)
+		{
+			attenuation = 0.3;
+		}
+		else
+		{
+			// Specular
+			specular = computeSpecular(gl_WorldRayDirectionEXT, lightDir, normal, vec3(0.2, 0.2, 0.2), 100.0);
+		}
+
+		hitValues += vec3(Params.lightInfos.w * attenuation * (diffuse + specular));
+	}
+	vec3 finalcolor = hitValues / NBSAMPLES;
 
 	PrimaryRay.color = finalcolor;
 	PrimaryRay.dist = gl_HitTEXT;

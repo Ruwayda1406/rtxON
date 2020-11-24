@@ -7,5 +7,5 @@
 layout(location = SWS_LOC_SHADOW_RAY) rayPayloadInEXT ShadowRayPayload ShadowRay;
 
 void main() {
-    ShadowRay.distance = -1.0f;
+	ShadowRay.isShadowed = false;
 }

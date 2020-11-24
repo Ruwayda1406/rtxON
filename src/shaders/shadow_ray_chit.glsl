@@ -7,5 +7,6 @@
 layout(location = SWS_LOC_SHADOW_RAY) rayPayloadInEXT ShadowRayPayload ShadowRay;
 
 void main() {
-    ShadowRay.distance = gl_HitTEXT;
+	
+	ShadowRay.isShadowed = true;
 }

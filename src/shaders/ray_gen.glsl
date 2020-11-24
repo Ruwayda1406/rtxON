@@ -20,6 +20,7 @@ layout(location = SWS_LOC_PRIMARY_RAY) rayPayloadEXT RayPayload PrimaryRay;
 
 vec3 CalcRayDir(vec2 pixel, float aspect) {
 
+	vec3 w = Camera.dir.xyz;
 	vec3 u = Camera.side.xyz;
 	vec3 v = Camera.up.xyz;
 
@@ -28,7 +29,7 @@ vec3 CalcRayDir(vec2 pixel, float aspect) {
 	u *= (planeWidth * aspect);
 	v *= planeWidth;
 
-	const vec3 rayDir = normalize(Camera.dir.xyz + (u * pixel.x) - (v * pixel.y));
+	const vec3 rayDir = normalize(w + (u * pixel.x) - (v * pixel.y));
 	return rayDir;
 }
 void main() {

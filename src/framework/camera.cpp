@@ -42,10 +42,11 @@ void Camera::LookAt(const vec3& pos, const vec3& target) {
 	this->MakeTransform();
 }
 
-void Camera::Move(const float x, const float z) {
-	//vec3 cameraSide = normalize(cross(mDirection, sCameraUp));
-	mPosition += vec3( x,0,z);
-	//mPosition += mDirection * y;
+void Camera::Move(const float side, const float direction) {
+	vec3 cameraSide = normalize(cross(mDirection, sCameraUp));
+
+	mPosition += cameraSide * side;
+	mPosition += mDirection * direction;
 
 	this->MakeTransform();
 }
