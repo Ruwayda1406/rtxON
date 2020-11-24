@@ -67,13 +67,9 @@ void main() {
 	// Computing the normal at hit position
 	const vec3 normal = normalize(BaryLerp(v0.normal.xyz, v1.normal.xyz, v2.normal.xyz, barycentrics));
 	//const vec2 uv = BaryLerp(v0.uv.xy, v1.uv.xy, v2.uv.xy, barycentrics);
-
-	const vec3 hitPos = gl_WorldRayOriginEXT + gl_WorldRayDirectionEXT * gl_HitTEXT;
-	const vec3 lightDir = normalize(Params.lightInfos.xyz - vec3(0));
 	const vec3 color = meshInfoArray[objId].info.xyz;
-	vec3  diffuse = computeDiffuse(lightDir, normal, vec3(0.2, 0.2, 0.2), color);
+	const vec3 hitPos = gl_WorldRayOriginEXT + gl_WorldRayDirectionEXT * gl_HitTEXT;
 	
-	vec3  specular = vec3(0);
 	float attenuation = 1;
 	float lightDistance = 100000.0;
 
@@ -84,20 +80,12 @@ void main() {
 	const float tmin = 0.001;
 	const float tmax = lightDistance;
 
-	// Initialize the random number
-	uint seed = tea(gl_LaunchIDEXT.y * gl_LaunchSizeEXT.x + gl_LaunchIDEXT.x, int(Params.modeFrame.y));
 	vec3 hitValues = vec3(0);
-
-	int NBSAMPLES = 1;
-	for (int smpl = 0; smpl < NBSAMPLES; smpl++)
+	for (int i = 0; i < Params.LightInfo.x; i++)//SoftShadows
 	{
-		float r1 = rnd(seed);
-		float r2 = rnd(seed);
-		float r3 = rnd(seed);
-		// Subpixel jitter: send the ray through a different position inside the pixel
-		// each time, to provide antialiasing.
-		vec3 sublight_jitter = vec3(0.5f, 0.5f, 0.5f);// int(Params.modeFrame.y) == 0 ? vec3(0.5f, 0.5f, 0.5f) : vec3(r1, r2, r3);
-		const vec3 toLight = normalize(Params.lightInfos.xyz);// +sublight_jitter);
+		const vec3 toLight = normalize(Params.LightSource[i].xyz);
+		vec3  diffuse = computeDiffuse(toLight, normal, vec3(0.2, 0.2, 0.2), color);
+		vec3  specular = vec3(0);
 		const vec3 shadowRayOrigin = hitPos + normal * 0.001f;
 		ShadowRay.isShadowed = true;
 		traceRayEXT(Scene,
@@ -115,17 +103,17 @@ void main() {
 		float lighting;
 		if (ShadowRay.isShadowed)
 		{
-			attenuation = 0.3;
+			attenuation = Params.LightInfo.y;
 		}
 		else
 		{
 			// Specular
-			specular = computeSpecular(gl_WorldRayDirectionEXT, lightDir, normal, vec3(0.2, 0.2, 0.2), 100.0);
+			specular = computeSpecular(gl_WorldRayDirectionEXT, toLight, normal, vec3(0.2, 0.2, 0.2), 100.0);
 		}
 
-		hitValues += vec3(Params.lightInfos.w * attenuation * (diffuse + specular));
+		hitValues += vec3(Params.LightSource[i].w * attenuation * (diffuse + specular));
 	}
-	vec3 finalcolor = hitValues / NBSAMPLES;
+	vec3 finalcolor = hitValues / Params.LightInfo.x;
 
 	PrimaryRay.color = finalcolor;
 	PrimaryRay.dist = gl_HitTEXT;

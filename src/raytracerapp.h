@@ -73,9 +73,38 @@ private:
 };
 class Light
 {
+
 public:
+	float ShadowAttenuation;
 	vec3 lightPos;//lightPosition
-	Light() : lightPos(vec3(0.4f, 1.45f, 0.55f)) {}
+	Array<vec4> LightSource;
+	float LightIntensity;
+	int size;
+	int width;
+	Light() : lightPos(vec3(0.4f, 1.45f, 0.55f)) , ShadowAttenuation(0.5), LightIntensity(0.7f),width(5)
+	{
+		size = width* width;
+		LightSource = Array<vec4>(size);
+		createLightSource();
+	}
+	void move(vec3 step)
+	{
+		lightPos = lightPos+step;
+		createLightSource();
+	}
+	void createLightSource()
+	{
+		int index = 0;
+		int start = (width / 2) *-1;
+		int end = (width / 2);
+		for (int i = start; i < end; i++)
+		{
+			for (int j = start; j < end; j++)
+			{
+				LightSource[index++] = vec4(lightPos + vec3(i/100.0, 0, j/100.0), LightIntensity);
+			}
+		}
+	}
 };
 class RayTracerApp : public VulkanApp {
 public:

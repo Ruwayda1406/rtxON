@@ -33,11 +33,12 @@ vec3 CalcRayDir(vec2 pixel, float aspect) {
 	return rayDir;
 }
 void main() {
+
 	// Initialize the random number
 	uint seed = tea(gl_LaunchIDEXT.y * gl_LaunchSizeEXT.x + gl_LaunchIDEXT.x, int(Params.modeFrame.y));
 	vec3 hitValues = vec3(0);
 
-	int NBSAMPLES = 10;
+	int NBSAMPLES = 20;	// monte carlo antialiasing
 	for (int smpl = 0; smpl < NBSAMPLES; smpl++)
 	{
 		float r1 = rnd(seed);

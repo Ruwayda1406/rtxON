@@ -7,7 +7,6 @@
 static const String sShadersFolder = "_data/shaders/";
 static const String sScenesFolder = "_data/scenes/";
 
-
 static float sAmbientLight = 0.55f;
 static vec4 backgroundColor = vec4(0.7 , 0.8 , 1.0,1.0);
 static vec4 planeColor = vec4(0.7 , 0.8 , 0.5,1.0);
@@ -53,13 +52,13 @@ void RayTracerApp::InitApp() {
     this->CreateRaytracingPipelineAndSBT();
     this->UpdateDescriptorSets();
 }
-void RayTracerApp::updateUniformParams(const float dt) {
+void RayTracerApp::updateUniformParams(const float deltaTime) {
 	// update values
 	if (mWKeyDown) {
-		mLight.lightPos = mLight.lightPos + vec3(0.01, 0, 0);
+		mLight.move(vec3(0.01, 0, 0));
 	}
 	if (mSKeyDown) {
-		mLight.lightPos = mLight.lightPos - vec3(0.01, 0, 0);
+		mLight.move(vec3(-0.01, 0, 0));
 	}
 	if (mRightKeyDown || mLeftKeyDown || mDownKeyDown || mUpKeyDown){
 		vec2 moveDelta(0.0f, 0.0f);
@@ -76,7 +75,7 @@ void RayTracerApp::updateUniformParams(const float dt) {
 			moveDelta.x += 1.0f;
 		}
 
-		moveDelta *= sMoveSpeed * dt ;
+		moveDelta *= sMoveSpeed * deltaTime;
 		mCamera.Move(moveDelta.x, moveDelta.y);
 	}
 	//////////////////////////////////////////////////////////
@@ -92,8 +91,12 @@ void RayTracerApp::updateUniformParams(const float dt) {
 	// copy others data to gpu
 	UniformParams* params = reinterpret_cast<UniformParams*>(mUniformParamsBuffer.Map());
 	params->clearColor = backgroundColor;
-	params->lightInfos = vec4(mLight.lightPos, sAmbientLight);
-	params->modeFrame= vec4(mode,floor(dt*10),0.0,0.0);
+	for (int i = 0; i < mLight.size; i++)
+	{
+		params->LightSource[i] = mLight.LightSource[i];
+	}
+	params->LightInfo = vec4(mLight.size, mLight.ShadowAttenuation,0,0);
+	params->modeFrame= vec4(mode,floor(deltaTime*100.0),0.0,0.0);
 	mUniformParamsBuffer.Unmap();
 }
 void RayTracerApp::FreeResources() {
@@ -227,13 +230,13 @@ void RayTracerApp::OnMouseButton(const int button, const int action, const int m
 	}
 }
 
-void RayTracerApp::Update(const size_t, const float dt) {
+void RayTracerApp::Update(const size_t, const float deltaTime) {
     // Update FPS text
     String frameStats = ToString(mFPSMeter.GetFPS(), 1) + " FPS (" + ToString(mFPSMeter.GetFrameTime(), 1) + " ms)";
     String fullTitle = mSettings.name + "  " + frameStats;
     glfwSetWindowTitle(mWindow, fullTitle.c_str());
     /////////////////
-	this->updateUniformParams(dt);
+	this->updateUniformParams(deltaTime);
 }
 
 
