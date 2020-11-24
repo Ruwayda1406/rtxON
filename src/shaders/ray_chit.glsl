@@ -16,7 +16,7 @@ layout(set = SWS_FACES_SET, binding = 0, std430) readonly buffer FacesBuffer {
 } FacesArray[];
 
 layout(set = SWS_MESHINFO_SET, binding = 0, std430) readonly buffer meshInfoBuffer {
-	vec4 info;
+	vec4 info[];
 } meshInfoArray[];
 
 layout(set = SWS_CAMDATA_SET, binding = SWS_CAMDATA_BINDING, std140)     uniform CameraData{
@@ -67,7 +67,11 @@ void main() {
 	// Computing the normal at hit position
 	const vec3 normal = normalize(BaryLerp(v0.normal.xyz, v1.normal.xyz, v2.normal.xyz, barycentrics));
 	//const vec2 uv = BaryLerp(v0.uv.xy, v1.uv.xy, v2.uv.xy, barycentrics);
-	const vec3 color = meshInfoArray[objId].info.xyz;
+	const vec3 color = meshInfoArray[objId].info[0].xyz;
+	const float kd = meshInfoArray[objId].info[1].x;
+	const float ks = meshInfoArray[objId].info[1].y;
+	const int mat =int(meshInfoArray[objId].info[1].z);
+
 	const vec3 hitPos = gl_WorldRayOriginEXT + gl_WorldRayDirectionEXT * gl_HitTEXT;
 	
 	float attenuation = 1;
@@ -84,7 +88,7 @@ void main() {
 	for (int i = 0; i < Params.LightInfo.x; i++)//SoftShadows
 	{
 		const vec3 toLight = normalize(Params.LightSource[i].xyz);
-		vec3  diffuse = computeDiffuse(toLight, normal, vec3(0.2, 0.2, 0.2), color);
+		vec3  diffuse = computeDiffuse(toLight, normal, vec3(kd), color);
 		vec3  specular = vec3(0);
 		const vec3 shadowRayOrigin = hitPos + normal * 0.001f;
 		ShadowRay.isShadowed = true;
@@ -108,17 +112,48 @@ void main() {
 		else
 		{
 			// Specular
-			specular = computeSpecular(gl_WorldRayDirectionEXT, toLight, normal, vec3(0.2, 0.2, 0.2), 100.0);
+			specular = computeSpecular(gl_WorldRayDirectionEXT, toLight, normal, vec3(ks), 100.0);
 		}
 
 		hitValues += vec3(Params.LightSource[i].w * attenuation * (diffuse + specular));
 	}
 	vec3 finalcolor = hitValues / Params.LightInfo.x;
 
+	
+	if (mat == 3)// Reflection
+	{
+		vec3 origin = hitPos;
+		vec3 rayDir = reflect(gl_WorldRayDirectionEXT, normal);
+		PrimaryRay.attenuation *= ks;
+		PrimaryRay.done = false;
+		PrimaryRay.rayOrigin = origin;
+		PrimaryRay.rayDir = rayDir;
+	}
+	else if (mat == 1)
+	{
+		const float NdotD = dot(normal, gl_WorldRayDirectionEXT);
+
+		vec3 refrNormal;
+		float refrEta;
+		const float kIceIndex = 1.0f / 1.31f;
+		if (NdotD > 0.0f) {
+			refrNormal = -normal;
+			refrEta = 1.0f / kIceIndex;
+		}
+		else {
+			refrNormal = normal;
+			refrEta = kIceIndex;
+		}
+
+		vec3 origin = hitPos;
+		vec3 rayDir = refract(gl_WorldRayDirectionEXT, refrNormal, refrEta);
+		PrimaryRay.done = false;
+		PrimaryRay.rayOrigin = origin;
+		PrimaryRay.rayDir = rayDir;
+	}
 	PrimaryRay.color = finalcolor;
-	PrimaryRay.dist = gl_HitTEXT;
-	PrimaryRay.normal = normal;
-	PrimaryRay.matId = int(meshInfoArray[objId].info.w);
-	PrimaryRay.isHit = true;
+	//PrimaryRay.dist = gl_HitTEXT;
+	//PrimaryRay.normal = normal;
+	//PrimaryRay.isHit = true;
 }
 

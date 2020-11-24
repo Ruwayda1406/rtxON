@@ -42,9 +42,12 @@ struct RayPayload {
     vec3 color;
     vec3 normal;
 	float dist;
-	int objId;
-	int matId;
-	bool isHit;
+	float attenuation;
+	bool done;
+	vec3 rayOrigin;
+	vec3 rayDir;
+	float accAlpha;
+	vec3 accColor;
 };
 
 struct ShadowRayPayload {

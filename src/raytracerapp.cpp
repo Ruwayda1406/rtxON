@@ -7,7 +7,6 @@
 static const String sShadersFolder = "_data/shaders/";
 static const String sScenesFolder = "_data/scenes/";
 
-static float sAmbientLight = 0.55f;
 static vec4 backgroundColor = vec4(0.7 , 0.8 , 1.0,1.0);
 static vec4 planeColor = vec4(0.7 , 0.8 , 0.5,1.0);
 static int mode = 0;
@@ -245,7 +244,7 @@ void RayTracerApp::CreateCamera() {
 	CHECK_VK_ERROR(error, "mCameraBuffer.Create");
 
 	mCamera.SetViewport({ 0, 0, static_cast<int>(mSettings.resolutionX), static_cast<int>(mSettings.resolutionY) });
-	mCamera.SetViewPlanes(0.1f, 100.0f);
+	mCamera.SetViewPlanes(0.1f, 1000.0f);
 	mCamera.SetFovY(45.0f);
 	mCamera.LookAt(vec3(-5.0f, 3.0f, 10.0f), vec3(-5.0f, 3.0f, 9.0f));
 
@@ -378,7 +377,7 @@ void RayTracerApp::LoadSceneGeometry(String fileName) {
 			const size_t indicesBufferSize = numFaces * 3 * sizeof(uint32_t);
 			const size_t facesBufferSize = numFaces * 4 * sizeof(uint32_t);
 			const size_t attribsBufferSize = numVertices * sizeof(VertexAttribute);
-			const size_t meshInfosBufferSize = 1 * sizeof(vec4);
+			const size_t meshInfosBufferSize = 2 * sizeof(vec4);
 
 			VkResult error = mesh.positions.Create(positionsBufferSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_RAY_TRACING_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 			CHECK_VK_ERROR(error, "mesh.positions.Create");
@@ -433,22 +432,33 @@ void RayTracerApp::LoadSceneGeometry(String fileName) {
 				faces[4 * f + 2] = c;
 			}
 
-			vec4& info = infos[0];//random rgb color
+			vec4& colorInfo = infos[0];//random rgb color
+			vec4& matInfo = infos[1];	// mat diffuse , specular
 			if (shape.name == "Plane")
 			{
-				info.x = planeColor.r;
-				info.y = planeColor.g;
-				info.z = planeColor.b;
-				info.w = 1.0;// alpha 
+				colorInfo.x = planeColor.r;
+				colorInfo.y = planeColor.g;
+				colorInfo.z = planeColor.b;
+				colorInfo.w = 1.0;// alpha 
+
+				matInfo.x = 0.2;
+				matInfo.y = 0.2;
+				matInfo.z = 3.0;//reflect
+				matInfo.w = 0.0;
 			}
 			else
 			{
-				info.x = getRandomFloat(0.5, 1.0);
-				info.y = getRandomFloat(0.5, 1.0);
-				info.z = getRandomFloat(0.5, 1.0);
-				info.w = getRandomFloat(0.0, 1.0);// alpha 
+				colorInfo.x = getRandomFloat(0.5, 1.0);
+				colorInfo.y = getRandomFloat(0.5, 1.0);
+				colorInfo.z = getRandomFloat(0.5, 1.0);
+				colorInfo.w = getRandomFloat(0.0, 1.0);// alpha 
+
+				matInfo.x = getRandomFloat(0.0, 0.5);
+				matInfo.y = getRandomFloat(0.0, 0.5);
+				matInfo.z = getRandomInt(0, 3);
+				matInfo.w = 0.0;
 			}
-			
+			//
 			
 
 

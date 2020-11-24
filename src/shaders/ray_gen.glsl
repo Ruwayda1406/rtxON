@@ -58,32 +58,57 @@ void main() {
 		//ray direction;
 		vec3 direction = CalcRayDir(pixel, aspect);
 
-		const uint rayFlags = gl_RayFlagsOpaqueEXT;
+		const uint rayFlags = gl_RayFlagsNoneEXT; ;// gl_RayFlagsOpaqueEXT;
 
 		const uint cullMask = 0xFF;
 		const uint stbRecordStride = 1;
 		const float tmin = 0.001;
-		const float tmax = Camera.nearFarFov.y;
+		const float tmax = 10000.0;// Camera.nearFarFov.y;
+
+	
+
+		PrimaryRay.done = true;
+		PrimaryRay.rayOrigin = origin.xyz;
+		PrimaryRay.rayDir = direction.xyz;
+		PrimaryRay.color = vec3(0);
+		PrimaryRay.attenuation = 1.f;
+
+		for (int i=0;i< SWS_MAX_RECURSION;i++)
+		{
+			traceRayEXT(Scene,
+				rayFlags,
+				cullMask,
+				SWS_PRIMARY_HIT_SHADERS_IDX,
+				stbRecordStride,
+				SWS_PRIMARY_MISS_SHADERS_IDX,
+				origin,
+				tmin,
+				direction,
+				tmax,
+				SWS_LOC_PRIMARY_RAY);
 
 
-		vec3 finalColor = vec3(0.0f);
-		traceRayEXT(Scene,
-			rayFlags,
-			cullMask,
-			SWS_PRIMARY_HIT_SHADERS_IDX,
-			stbRecordStride,
-			SWS_PRIMARY_MISS_SHADERS_IDX,
-			origin,
-			tmin,
-			direction,
-			tmax,
-			SWS_LOC_PRIMARY_RAY);
+			hitValues += PrimaryRay.color * PrimaryRay.attenuation;
 
-		const vec3 hitColor = PrimaryRay.color;
-		hitValues += hitColor;
+			if (PrimaryRay.done)
+				break;
+
+			origin = PrimaryRay.rayOrigin;
+			direction = PrimaryRay.rayDir;
+			PrimaryRay.done = true;  // Will stop if a reflective material isn't hit
+		}
 	}
 	vec3 finalColor = hitValues / NBSAMPLES;
 
-
-	imageStore(ResultImage, ivec2(gl_LaunchIDEXT.xy), vec4(finalColor, 1.0f));
+	// Do accumulation over time
+	/*if (int(Params.modeFrame.y) >= 0)
+	{
+		float a = 1.0f / float(Params.modeFrame.y + 1.0);
+		vec3  old_color = imageLoad(ResultImage, ivec2(gl_LaunchIDEXT.xy)).xyz;
+		imageStore(ResultImage, ivec2(gl_LaunchIDEXT.xy), vec4(mix(old_color, finalColor, a), 1.f));
+	}
+	else*/
+	{
+		imageStore(ResultImage, ivec2(gl_LaunchIDEXT.xy), vec4(LinearToSrgb(finalColor), 1.f));
+	}
 }
