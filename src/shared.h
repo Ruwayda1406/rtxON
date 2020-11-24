@@ -39,6 +39,7 @@
 #define SWS_MAX_RECURSION               10
 //////////////////////////////////////////
 struct RayPayload {
+	vec4 accColor;
     vec3 color;
     vec3 normal;
 	float dist;
@@ -46,8 +47,7 @@ struct RayPayload {
 	bool done;
 	vec3 rayOrigin;
 	vec3 rayDir;
-	float accAlpha;
-	vec3 accColor;
+
 };
 
 struct ShadowRayPayload {

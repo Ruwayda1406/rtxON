@@ -67,7 +67,7 @@ void main() {
 	// Computing the normal at hit position
 	const vec3 normal = normalize(BaryLerp(v0.normal.xyz, v1.normal.xyz, v2.normal.xyz, barycentrics));
 	//const vec2 uv = BaryLerp(v0.uv.xy, v1.uv.xy, v2.uv.xy, barycentrics);
-	const vec3 color = meshInfoArray[objId].info[0].xyz;
+	const vec3 color = PrimaryRay.accColor.xyz;// meshInfoArray[objId].info[0].xyz;
 	const float kd = meshInfoArray[objId].info[1].x;
 	const float ks = meshInfoArray[objId].info[1].y;
 	const int mat =int(meshInfoArray[objId].info[1].z);
@@ -129,7 +129,7 @@ void main() {
 		PrimaryRay.rayOrigin = origin;
 		PrimaryRay.rayDir = rayDir;
 	}
-	else if (mat == 1)
+	/*else if (mat == 2)
 	{
 		const float NdotD = dot(normal, gl_WorldRayDirectionEXT);
 
@@ -150,7 +150,7 @@ void main() {
 		PrimaryRay.done = false;
 		PrimaryRay.rayOrigin = origin;
 		PrimaryRay.rayDir = rayDir;
-	}
+	}*/
 	PrimaryRay.color = finalcolor;
 	//PrimaryRay.dist = gl_HitTEXT;
 	//PrimaryRay.normal = normal;

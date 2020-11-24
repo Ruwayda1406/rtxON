@@ -58,7 +58,7 @@ void main() {
 		//ray direction;
 		vec3 direction = CalcRayDir(pixel, aspect);
 
-		const uint rayFlags = gl_RayFlagsNoneEXT; ;// gl_RayFlagsOpaqueEXT;
+		const uint rayFlags = gl_RayFlagsNoOpaqueEXT;// gl_RayFlagsNoneEXT; ;// gl_RayFlagsOpaqueEXT;
 
 		const uint cullMask = 0xFF;
 		const uint stbRecordStride = 1;
@@ -72,6 +72,7 @@ void main() {
 		PrimaryRay.rayDir = direction.xyz;
 		PrimaryRay.color = vec3(0);
 		PrimaryRay.attenuation = 1.f;
+		PrimaryRay.accColor = vec4(0);
 
 		for (int i=0;i< SWS_MAX_RECURSION;i++)
 		{
@@ -96,6 +97,7 @@ void main() {
 			origin = PrimaryRay.rayOrigin;
 			direction = PrimaryRay.rayDir;
 			PrimaryRay.done = true;  // Will stop if a reflective material isn't hit
+			PrimaryRay.accColor = vec4(0);
 		}
 	}
 	vec3 finalColor = hitValues / NBSAMPLES;

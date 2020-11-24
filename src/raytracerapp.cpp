@@ -451,12 +451,21 @@ void RayTracerApp::LoadSceneGeometry(String fileName) {
 				colorInfo.x = getRandomFloat(0.5, 1.0);
 				colorInfo.y = getRandomFloat(0.5, 1.0);
 				colorInfo.z = getRandomFloat(0.5, 1.0);
-				colorInfo.w = getRandomFloat(0.0, 1.0);// alpha 
 
 				matInfo.x = getRandomFloat(0.0, 0.5);
 				matInfo.y = getRandomFloat(0.0, 0.5);
-				matInfo.z = getRandomInt(0, 3);
 				matInfo.w = 0.0;
+				matInfo.z = 0.0;
+				if (shape.name == "Sphere")
+				{
+					colorInfo.w = 0.5;// alpha 
+
+				}
+				else
+				{
+					colorInfo.w = 1.0;
+				}
+				
 			}
 			//
 			
@@ -739,7 +748,7 @@ void RayTracerApp::CreateDescriptorSetsLayouts() {
 	ssboBinding.binding = 0;
 	ssboBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 	ssboBinding.descriptorCount = numMeshes;
-	ssboBinding.stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR| VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
+	ssboBinding.stageFlags = VK_SHADER_STAGE_ALL;
 	ssboBinding.pImmutableSamplers = nullptr;
 
 	VkDescriptorSetLayoutCreateInfo set1LayoutInfo;
@@ -779,20 +788,18 @@ void RayTracerApp::CreateRaytracingPipelineAndSBT() {
 	VkResult error = vkCreatePipelineLayout(mDevice, &pipelineLayoutCreateInfo, nullptr, &mRTPipelineLayout);
 	CHECK_VK_ERROR(error, "vkCreatePipelineLayout");
 
-	vulkanhelpers::Shader rayGenShader, rayChitShader, rayMissShader, rayAhitShader, shadowChit, shadowMiss;
+	vulkanhelpers::Shader rayGenShader, rayChitShader, rayMissShader, rayAhitShader, shadowMiss;
     rayGenShader.LoadFromFile((sShadersFolder + "ray_gen.bin").c_str());
     rayChitShader.LoadFromFile((sShadersFolder + "ray_chit.bin").c_str());
-  //  rayAhitShader.LoadFromFile((sShadersFolder + "ray_anyhit.bin").c_str());
+    rayAhitShader.LoadFromFile((sShadersFolder + "ray_anyhit.bin").c_str());
 	rayMissShader.LoadFromFile((sShadersFolder + "ray_miss.bin").c_str());
-	shadowChit.LoadFromFile((sShadersFolder + "shadow_ray_chit.bin").c_str());
 	shadowMiss.LoadFromFile((sShadersFolder + "shadow_ray_miss.bin").c_str());
 
-    mShaderBindingTable.Initialize(2,2, mRTProps.shaderGroupHandleSize, mRTProps.shaderGroupBaseAlignment);
+    mShaderBindingTable.Initialize(1,2, mRTProps.shaderGroupHandleSize, mRTProps.shaderGroupBaseAlignment);
     mShaderBindingTable.SetRaygenStage(rayGenShader.GetShaderStage(VK_SHADER_STAGE_RAYGEN_BIT_KHR));
 	mShaderBindingTable.AddStageToHitGroup({ rayChitShader.GetShaderStage(VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR)
-		//,rayAhitShader.GetShaderStage(VK_SHADER_STAGE_ANY_HIT_BIT_KHR) 
+		,rayAhitShader.GetShaderStage(VK_SHADER_STAGE_ANY_HIT_BIT_KHR) 
 		}, SWS_PRIMARY_HIT_SHADERS_IDX);
-	mShaderBindingTable.AddStageToHitGroup({ shadowChit.GetShaderStage(VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR) }, SWS_SHADOW_HIT_SHADERS_IDX);
 
 	mShaderBindingTable.AddStageToMissGroup(rayMissShader.GetShaderStage(VK_SHADER_STAGE_MISS_BIT_KHR), SWS_PRIMARY_MISS_SHADERS_IDX);
 	mShaderBindingTable.AddStageToMissGroup(shadowMiss.GetShaderStage(VK_SHADER_STAGE_MISS_BIT_KHR), SWS_SHADOW_MISS_SHADERS_IDX);
