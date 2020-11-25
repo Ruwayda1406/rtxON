@@ -28,7 +28,7 @@ uint lcg(inout uint prev)
 }
 
 // Generate a random float in [0, 1) given the previous RNG state
-float rnd(inout uint prev)
+float nextRand(inout uint prev)
 {
   return (float(lcg(prev)) / float(0x01000000));
 }

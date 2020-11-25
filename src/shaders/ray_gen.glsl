@@ -42,8 +42,8 @@ void main() {
 	int NBSAMPLES = 20;	// monte carlo antialiasing
 	for (int smpl = 0; smpl < NBSAMPLES; smpl++)
 	{
-		float r1 = rnd(rndSeed);
-		float r2 = rnd(rndSeed);
+		float r1 = nextRand(rndSeed);
+		float r2 = nextRand(rndSeed);
 		// Subpixel jitter: send the ray through a different position inside the pixel
 		// each time, to provide antialiasing.
 		vec2 subpixel_jitter = int(Params.modeFrame.y) == 0 ? vec2(0.5f, 0.5f) : vec2(r1, r2);

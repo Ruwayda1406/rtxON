@@ -36,7 +36,7 @@
 #define SWS_LOC_PRIMARY_RAY             0
 #define SWS_LOC_HIT_ATTRIBS             1
 #define SWS_LOC_SHADOW_RAY              2
-#define SWS_LOC_INDIRECT_RAY			3
+
 #define SWS_MAX_RECURSION               10
 //////////////////////////////////////////
 struct RayPayload {
@@ -55,14 +55,13 @@ struct RayPayload {
 struct ShadowRayPayload {
 	bool isShadowed;
 };
-
 struct VertexAttribute {
     vec4 normal;
     vec4 uv;
 };
 
 struct ShadingData {
-	vec3 color;
+	vec3 difColor;
 	vec3 normal;
 	vec3 pos;
 	int mat;
