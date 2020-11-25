@@ -36,10 +36,11 @@
 #define SWS_LOC_PRIMARY_RAY             0
 #define SWS_LOC_HIT_ATTRIBS             1
 #define SWS_LOC_SHADOW_RAY              2
+#define SWS_LOC_INDIRECT_RAY			3
 #define SWS_MAX_RECURSION               10
 //////////////////////////////////////////
 struct RayPayload {
-	vec4 accColor;
+	vec4 accColor;// used in anyhit
     vec3 color;
     vec3 normal;
 	float dist;
@@ -47,6 +48,7 @@ struct RayPayload {
 	bool done;
 	vec3 rayOrigin;
 	vec3 rayDir;
+	uint rndSeed; // current random seed
 
 };
 
@@ -59,6 +61,13 @@ struct VertexAttribute {
     vec4 uv;
 };
 
+struct ShadingData {
+	vec3 color;
+	vec3 normal;
+	vec3 pos;
+	int mat;
+	float ks, kd;
+};
 // packed std140
 struct CameraUniformParams {
     // Camera

@@ -7,7 +7,6 @@
 #include <iomanip>
 template <typename T>
 using Array = std::vector<T>;
-
 using String = std::basic_string<char, std::char_traits<char>>;
 using WString = std::basic_string<wchar_t, std::char_traits<wchar_t>>;
 
@@ -38,7 +37,7 @@ using ivec4 = glm::highp_ivec4;
 using vec4 = glm::highp_vec4;
 using mat4 = glm::highp_mat4;
 using quat = glm::highp_quat;
-
+using uint = glm::highp_uint32_t;
 struct Recti { int left, top, right, bottom; };
 
 static const float MM_Pi = 3.1415926536f;

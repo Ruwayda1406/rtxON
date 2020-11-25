@@ -15,9 +15,10 @@ void main() {
 	// Is this a transparent part of the surface?  If so, ignore this hit
 	if (PrimaryRay.accColor.w < 1.0)
 	{
+		vec4 hitColor = meshInfoArray[objId].info[0];
 		// Front-to-back compositing
-		PrimaryRay.accColor = (1.0 - PrimaryRay.accColor.w) * meshInfoArray[objId].info[0] + PrimaryRay.accColor;
-		if (meshInfoArray[objId].info[0].w < 1.0)
+		PrimaryRay.accColor = (1.0 - PrimaryRay.accColor.w) * hitColor + PrimaryRay.accColor;
+		if (hitColor.w < 1.0)
 		{
 			ignoreIntersectionEXT();
 		}

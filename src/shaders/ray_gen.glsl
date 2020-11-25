@@ -35,14 +35,15 @@ vec3 CalcRayDir(vec2 pixel, float aspect) {
 void main() {
 
 	// Initialize the random number
-	uint seed = tea(gl_LaunchIDEXT.y * gl_LaunchSizeEXT.x + gl_LaunchIDEXT.x, int(Params.modeFrame.y));
-	vec3 hitValues = vec3(0);
+	uint rndSeed = tea(gl_LaunchIDEXT.y * gl_LaunchSizeEXT.x + gl_LaunchIDEXT.x, int(Params.modeFrame.y));
+	PrimaryRay.rndSeed = rndSeed;
 
+	vec3 hitValues = vec3(0);
 	int NBSAMPLES = 20;	// monte carlo antialiasing
 	for (int smpl = 0; smpl < NBSAMPLES; smpl++)
 	{
-		float r1 = rnd(seed);
-		float r2 = rnd(seed);
+		float r1 = rnd(rndSeed);
+		float r2 = rnd(rndSeed);
 		// Subpixel jitter: send the ray through a different position inside the pixel
 		// each time, to provide antialiasing.
 		vec2 subpixel_jitter = int(Params.modeFrame.y) == 0 ? vec2(0.5f, 0.5f) : vec2(r1, r2);
@@ -111,6 +112,7 @@ void main() {
 	}
 	else*/
 	{
+		//imageStore(ResultImage, ivec2(gl_LaunchIDEXT.xy), vec4((finalColor), 1.f));
 		imageStore(ResultImage, ivec2(gl_LaunchIDEXT.xy), vec4(LinearToSrgb(finalColor), 1.f));
 	}
 }
