@@ -101,14 +101,19 @@ vec3 DiffuseShade(vec3 pos, vec3 normal, vec3 difColor, float kd,float ks)
 	vec3 hitValues = vec3(0);
 	for (int i = 0; i < Params.LightInfo.x; i++)//SoftShadows
 	{
-		const vec3 toLight = normalize(Params.LightSource[i].xyz);
-		vec3  diffuse = computeDiffuse(toLight, normal, vec3(kd), difColor);
+		// Get information about this light; access your framework’s scene structs
+		vec3 lightIntensity = vec3(Params.LightSource[i].w);
+		vec3 lightPos = Params.LightSource[i].xyz;
+		float distToLight = length(lightPos-vec3(0));
+		vec3 dirToLight = normalize(lightPos - vec3(0));
+
+		vec3  diffuse = computeDiffuse(dirToLight, normal, vec3(kd), difColor);
 		vec3  specular = vec3(0);
 		float attenuation = 1;
 
 		const vec3 shadowRayOrigin = pos + normal * 0.001f;
 
-		bool isShadowed = shootShadowRay(shadowRayOrigin, toLight, 0.001, 100000.0);
+		bool isShadowed = shootShadowRay(shadowRayOrigin, dirToLight, 0.001, distToLight);
 		float lighting;
 		if (isShadowed)
 		{
@@ -117,7 +122,7 @@ vec3 DiffuseShade(vec3 pos, vec3 normal, vec3 difColor, float kd,float ks)
 		else
 		{
 			// Specular
-			specular = computeSpecular(gl_WorldRayDirectionEXT, toLight, normal, vec3(ks), 100.0);
+			specular = computeSpecular(gl_WorldRayDirectionEXT, dirToLight, normal, vec3(ks), 100.0);
 		}
 
 		hitValues += vec3(Params.LightSource[i].w * attenuation * (diffuse + specular));
@@ -139,8 +144,9 @@ vec3 DiffuseShade2(vec3 pos, vec3 normal, vec3 difColor, float kd, float ks, uin
 	// Get information about this light; access your framework’s scene structs
 	vec3 lightIntensity = vec3(Params.LightSource[randomLight].w);
 	vec3 lightPos = Params.LightSource[randomLight].xyz;
-	float distToLight = length(lightPos - pos);
-	vec3 dirToLight = normalize(lightPos - pos);
+	//float distToLight = length(lightPos - pos);
+	//vec3 dirToLight = normalize(lightPos - pos);	float distToLight = length(lightPos - vec3(0));
+	vec3 dirToLight = normalize(lightPos - vec3(0));
 	// Compute our NdotL term; shoot our shadow ray in selected direction
 	// Compute our NdotL term; shoot our shadow ray in selected direction
 	float NdotL = clamp(dot(normal, dirToLight), 0.0, 1.0); // In range [0..1]
@@ -160,7 +166,7 @@ vec3 DiffuseShade2(vec3 pos, vec3 normal, vec3 difColor, float kd, float ks, uin
 	return (NdotL * rayColor * (difColor / M_PI)) / sampleProb;
 }
 void main() {
-	
+	PrimaryRay.isMiss = false;
 	// Object of this instance
 	const uint objId = gl_InstanceCustomIndexEXT;// scnDesc.i[gl_InstanceID].objId;
 	ShadingData hit = getHitShadingData(objId);

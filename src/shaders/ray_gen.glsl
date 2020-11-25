@@ -31,7 +31,7 @@ vec3 CalcRayDir(vec2 pixel, float aspect) {
 	const vec3 rayDir = normalize(w + (u * pixel.x) - (v * pixel.y));
 	return rayDir;
 }
-vec3 shootColorRay(vec3 rayOrigin, vec3 rayDirection, float min, float max)
+vec3 shootColorRay(vec3 rayOrigin, vec3 rayDirection, float min, float max, uint rndSeed)
 {
 	const uint rayFlags = gl_RayFlagsNoOpaqueEXT;// gl_RayFlagsNoneEXT; ;// gl_RayFlagsOpaqueEXT;
 
@@ -75,6 +75,21 @@ vec3 shootColorRay(vec3 rayOrigin, vec3 rayDirection, float min, float max)
 	return hitValue;
 
 }
+vec3 getCosWeightedRandomDir(float r1, float r2, vec3 hitNormal)
+{
+	vec3 Nt, Nb;
+	if (abs(hitNormal.x) > abs(hitNormal.y))
+		Nt = normalize(vec3(hitNormal.z, 0, -hitNormal.x) / sqrt(hitNormal.x * hitNormal.x + hitNormal.z * hitNormal.z));
+	else
+		Nt = normalize(vec3(0, -hitNormal.z, hitNormal.y) / sqrt(hitNormal.y * hitNormal.y + hitNormal.z * hitNormal.z));
+	Nb = cross(hitNormal, Nt);
+
+	vec3 samp = uniformSampleHemisphere(r1, r2);
+	vec3 giDir = vec3((samp.x * Nb.x + samp.y * hitNormal.x + samp.z * Nt.x),
+		(samp.x * Nb.y + samp.y * hitNormal.y + samp.z * Nt.y),
+		(samp.x * Nb.z + samp.y * hitNormal.z + samp.z * Nt.z));
+	return normalize(giDir);
+}
 void main() {
 
 	// First:: // Do diffuse shading at the primary hit
@@ -101,26 +116,41 @@ void main() {
 		vec3 origin = Camera.pos.xyz;
 		//ray direction;
 		vec3 direction = CalcRayDir(pixel, aspect);
-		vec3  hitValue = shootColorRay(origin, direction, 0.0001, 10000.0);
+		vec3  hitValue = shootColorRay(origin, direction, 0.0001, 10000.0, rndSeed);
 		hitValues += hitValue;
 
 	}
-	vec3 difColor = hitValues / NBSAMPLES;
-	vec3 wsNorm = PrimaryRay.normal;
-	vec3 wsPos = PrimaryRay.pos;
-	//Second:: global illumination indirect ray
-	// Do indirect
-	PrimaryRay.rndSeed = rndSeed;
-	PrimaryRay.isIndirect = true;
-	PrimaryRay.difColor = difColor;
-	
-	// Pick random direction for global illumination indirect ray; shoot ray
-	//vec3 giDir = getCosWeightedRandomDir(rndSeed, wsNorm);
-	//vec3 giColor = shootColorRay(wsPos, giDir, 0.0001, randSeed);
-	// Accumulate properly weighted result into final color
-    // Due to cosine-weighting, terms cancel, leaving simpler equation
-	vec3 color = vec3(0);
-	//color += difColor * giColor;
+	vec3 directLighting = hitValues / NBSAMPLES;
+	vec3 color;
+	if (PrimaryRay.isMiss == true)
+	{
+		color = directLighting;
+	}
+	else
+	{
+		vec3 hitNormal = PrimaryRay.normal;
+		vec3 hitPos = PrimaryRay.pos;
+		//Second:: global illumination indirect ray
+		// Do indirect
+		PrimaryRay.rndSeed = rndSeed;
+		PrimaryRay.isIndirect = true;
+		PrimaryRay.difColor = directLighting;
+
+		// Pick random direction for global illumination indirect ray; shoot ray
+		vec3 indirectLigthing = vec3(0);
+		int MAX_GI_RAYS = 200;
+		for (int smpl = 0; smpl < MAX_GI_RAYS; smpl++)
+		{
+			float r1 = nextRand(rndSeed);
+			float r2 = nextRand(rndSeed);
+			vec3 giDir = getCosWeightedRandomDir(r1, r2, hitNormal);
+			vec3 giColor = shootColorRay(hitPos, giDir, 0.0001, 10000.0, rndSeed);
+			// Accumulate properly weighted result into final color
+			// Due to cosine-weighting, terms cancel, leaving simpler equation
+			indirectLigthing += giColor;
+		}
+		color = directLighting * (indirectLigthing / float(MAX_GI_RAYS));
+	}
 
 	//Finally :::save the color ///////////////////////
 	// Do accumulation over time
@@ -133,6 +163,6 @@ void main() {
 	else*/
 	{
 		//imageStore(ResultImage, ivec2(gl_LaunchIDEXT.xy), vec4((finalColor), 1.f));
-		imageStore(ResultImage, ivec2(gl_LaunchIDEXT.xy), vec4(LinearToSrgb(difColor), 1.f));
+		imageStore(ResultImage, ivec2(gl_LaunchIDEXT.xy), vec4(LinearToSrgb(color), 1.f));
 	}
 }

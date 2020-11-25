@@ -50,6 +50,7 @@ struct RayPayload {
 	float dist;
 	float attenuation;
 	bool done;
+	bool isMiss;
 	vec3 rayOrigin;
 	vec3 rayDir;
 	uint rndSeed; // current random seed

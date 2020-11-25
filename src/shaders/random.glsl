@@ -32,3 +32,15 @@ float nextRand(inout uint prev)
 {
   return (float(lcg(prev)) / float(0x01000000));
 }
+
+vec3 uniformSampleHemisphere(const float r1, const float r2)
+{
+	const float M_PI = 3.1415926536f;
+	// cos(theta) = r1 = y
+	// cos^2(theta) + sin^2(theta) = 1 -> sin(theta) = srtf(1 - cos^2(theta))
+	float sinTheta = sqrt(1.0 - r1 * r1);
+	float phi = 2.0 * M_PI * r2;
+	float x = sinTheta * cos(phi);
+	float y = sinTheta * sin(phi);
+	return vec3(x, y, sinTheta);
+}

@@ -115,4 +115,3 @@ constexpr auto MatProjection = glm::perspectiveRH_ZO<float>;
 constexpr auto MatLookAt = glm::lookAtRH<float, glm::highp>;
 
 constexpr auto QToMat = glm::toMat4<float, glm::highp>;
-

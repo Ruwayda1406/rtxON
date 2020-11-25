@@ -12,4 +12,5 @@ layout(set = SWS_UNIFORMPARAMS_SET, binding = SWS_UNIFORMPARAMS_BINDING, std140)
 void main() {
 
 	PrimaryRay.color = vec3(Params.clearColor);
+	PrimaryRay.isMiss = true;
 }
