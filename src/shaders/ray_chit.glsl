@@ -74,17 +74,35 @@ ShadingData getHitShadingData(uint objId)
 
 	return closestHit;
 }
-vec3 DiffuseShade(vec3 pos, vec3 normal, vec3 difColor, float kd,float ks,int mat, uint rndSeed)
+bool shootColorRay(vec3 shadowRayOrigin, vec3 shadowRayDirection, float min, float max)
 {
-
-	float attenuation = 1;
-	float lightDistance = 100000.0;
+	float lightDistance = max;
 
 	const uint shadowRayFlags = gl_RayFlagsOpaqueEXT | gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT;
 	const uint cullMask = 0xFF;
 	const uint stbRecordStride = 1;
 	const float tmin = 0.001;
 	const float tmax = lightDistance;
+	ShadowRay.isShadowed = true;
+	traceRayEXT(Scene,
+		shadowRayFlags,
+		cullMask,
+		0,
+		stbRecordStride,
+		SWS_SHADOW_MISS_SHADERS_IDX,
+		shadowRayOrigin,
+		0.0f,
+		shadowRayDirection,
+		tmax,
+		SWS_LOC_SHADOW_RAY);
+	return ShadowRay.isShadowed;
+
+}
+vec3 DiffuseShade(vec3 pos, vec3 normal, vec3 difColor, float kd,float ks,int mat, uint rndSeed)
+{
+
+	
+	
 
 	vec3 hitValues = vec3(0);
 	for (int i = 0; i < Params.LightInfo.x; i++)//SoftShadows
@@ -92,22 +110,13 @@ vec3 DiffuseShade(vec3 pos, vec3 normal, vec3 difColor, float kd,float ks,int ma
 		const vec3 toLight = normalize(Params.LightSource[i].xyz);
 		vec3  diffuse = computeDiffuse(toLight, normal, vec3(kd), difColor);
 		vec3  specular = vec3(0);
-		const vec3 shadowRayOrigin = pos + normal * 0.001f;
-		ShadowRay.isShadowed = true;
-		traceRayEXT(Scene,
-			shadowRayFlags,
-			cullMask,
-			0,
-			stbRecordStride,
-			SWS_SHADOW_MISS_SHADERS_IDX,
-			shadowRayOrigin,
-			0.0f,
-			toLight,
-			tmax,
-			SWS_LOC_SHADOW_RAY);
+		float attenuation = 1;
 
+		const vec3 shadowRayOrigin = pos + normal * 0.001f;
+
+		bool isShadowed = shootColorRay(shadowRayOrigin, toLight, 0.001, 100000.0);
 		float lighting;
-		if (ShadowRay.isShadowed)
+		if (isShadowed)
 		{
 			attenuation = Params.LightInfo.y;
 		}
@@ -168,3 +177,6 @@ void main() {
 	//PrimaryRay.isHit = true;
 }
 
+/*
+vec3 DiffuseShade(vec3 pos, vec3 normal, vec3 difColor, float kd,float ks,int mat, uint rndSeed)
+{*/
