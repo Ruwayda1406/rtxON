@@ -134,22 +134,33 @@ void main() {
 		// Do indirect
 		PrimaryRay.rndSeed = rndSeed;
 		PrimaryRay.isIndirect = true;
-		PrimaryRay.difColor = directLighting;
-
+		PrimaryRay.rayDepth = 0;
 		// Pick random direction for global illumination indirect ray; shoot ray
 		vec3 indirectLigthing = vec3(0);
-		int MAX_GI_RAYS = 200;
-		for (int smpl = 0; smpl < MAX_GI_RAYS; smpl++)
+		///////////////////////////////////////////////////////
+		for (int p = 0; p < MAX_PATHS; p++)
 		{
-			float r1 = nextRand(rndSeed);
-			float r2 = nextRand(rndSeed);
-			vec3 giDir = getCosWeightedRandomDir(r1, r2, hitNormal);
-			vec3 giColor = shootColorRay(hitPos, giDir, 0.0001, 10000.0, rndSeed);
-			// Accumulate properly weighted result into final color
-			// Due to cosine-weighting, terms cancel, leaving simpler equation
-			indirectLigthing += giColor;
+			PrimaryRay.rayOrigin = hitPos;
+			PrimaryRay.normal = hitNormal;
+			PrimaryRay.rayDepth = 0;
+			PrimaryRay.difColor = directLighting;
+			PrimaryRay.color = vec3(0);
+			for (;;)
+			{
+				float r1 = nextRand(rndSeed);
+				float r2 = nextRand(rndSeed);
+				vec3 giDir = getCosWeightedRandomDir(r1, r2, PrimaryRay.normal);
+				vec3 giColor = shootColorRay(PrimaryRay.rayOrigin, giDir, 0.0001, 10000.0, rndSeed);
+				indirectLigthing += directLighting * giColor;
+				if (PrimaryRay.done)
+				{
+					break;
+				}
+			}
+			
 		}
-		color = directLighting * (indirectLigthing / float(MAX_GI_RAYS));
+		/////////////////////////////////////////////////////////////////////
+		color = indirectLigthing / float(MAX_PATHS);
 	}
 
 	//Finally :::save the color ///////////////////////
@@ -158,11 +169,11 @@ void main() {
 	{
 		float a = 1.0f / float(Params.modeFrame.y + 1.0);
 		vec3  old_color = imageLoad(ResultImage, ivec2(gl_LaunchIDEXT.xy)).xyz;
-		imageStore(ResultImage, ivec2(gl_LaunchIDEXT.xy), vec4(mix(old_color, finalColor, a), 1.f));
+		imageStore(ResultImage, ivec2(gl_LaunchIDEXT.xy), vec4(mix(old_color, color, a), 1.f));
 	}
 	else*/
 	{
 		//imageStore(ResultImage, ivec2(gl_LaunchIDEXT.xy), vec4((finalColor), 1.f));
-		imageStore(ResultImage, ivec2(gl_LaunchIDEXT.xy), vec4(LinearToSrgb(color), 1.f));
+		imageStore(ResultImage, ivec2(gl_LaunchIDEXT.xy), vec4((color), 1.f));
 	}
 }

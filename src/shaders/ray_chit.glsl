@@ -36,8 +36,8 @@ hitAttributeEXT vec2 HitAttribs;
 vec3 computeDiffuse(vec3 lightDir, vec3 normal, vec3 kd, vec3 ka)
 {
 	// Lambertian
-	float dotNL = max(dot(normal, lightDir), 0.0);
-	vec3  c = kd * dotNL;
+	float NdotL = clamp(dot(normal, lightDir), 0.0, 1.0); // In range [0..1]
+	vec3  c = kd * NdotL;
 	c += ka;
 
 	return c;
@@ -47,7 +47,8 @@ vec3 computeSpecular(vec3 viewDir, vec3 lightDir, vec3 normal, vec3 ks, float sh
 {
 	vec3        V = normalize(-viewDir);
 	vec3        R = reflect(-lightDir, normal);
-	float       specular = pow(max(dot(V, R), 0.0), shininess);
+	float	VdotR = clamp(dot(V, R), 0.0, 1.0); // In range [0..1]
+	float       specular = pow(VdotR, shininess);
 	return vec3(ks * specular);
 }
 ShadingData getHitShadingData(uint objId)
@@ -65,7 +66,7 @@ ShadingData getHitShadingData(uint objId)
 	// Computing the normal at hit position
 	closestHit.normal = normalize(BaryLerp(v0.normal.xyz, v1.normal.xyz, v2.normal.xyz, barycentrics));
 	//const vec2 uv = BaryLerp(v0.uv.xy, v1.uv.xy, v2.uv.xy, barycentrics);
-	closestHit.difColor = PrimaryRay.accColor.xyz;// meshInfoArray[objId].info[0].xyz;
+	closestHit.difColor = PrimaryRay.accColor.xyzw;// meshInfoArray[objId].info[0].xyz;
 	closestHit.kd = meshInfoArray[objId].info[1].x;
 	closestHit.ks = meshInfoArray[objId].info[1].y;
 	closestHit.mat = int(meshInfoArray[objId].info[1].z);
@@ -132,6 +133,72 @@ vec3 DiffuseShade(vec3 pos, vec3 normal, vec3 difColor, float kd,float ks)
 
 	return finalcolor;
 }
+void main() {
+	PrimaryRay.isMiss = false;
+	// Object of this instance
+	const uint objId = gl_InstanceCustomIndexEXT;
+	ShadingData hit = getHitShadingData(objId);
+	
+	if (!PrimaryRay.isIndirect)
+	{
+		PrimaryRay.color = DiffuseShade(hit.pos, hit.normal, hit.difColor.xyz, hit.kd, hit.ks);
+		PrimaryRay.normal = hit.normal;
+		PrimaryRay.pos = hit.pos;
+
+		if (hit.mat == 3)// Reflection
+		{
+			vec3 origin = hit.pos;
+			vec3 rayDir = reflect(gl_WorldRayDirectionEXT, hit.normal);
+			PrimaryRay.attenuation *= hit.ks;
+			PrimaryRay.done = false;
+			PrimaryRay.rayOrigin = origin;
+			PrimaryRay.rayDir = rayDir;
+		}
+	}
+	else
+	{
+		PrimaryRay.color = DiffuseShade(hit.pos, hit.normal, PrimaryRay.difColor.xyz, hit.kd, hit.ks);
+		if (PrimaryRay.rayDepth < MaxRayDepth)
+		{
+			PrimaryRay.done = false;
+			PrimaryRay.rayOrigin = hit.pos;
+			PrimaryRay.normal = hit.normal;
+			PrimaryRay.rayDepth += 1;
+		}
+	}
+}
+
+
+
+
+
+
+
+
+/*else if (mat == 2)
+{
+	const float NdotD = dot(normal, gl_WorldRayDirectionEXT);
+
+	vec3 refrNormal;
+	float refrEta;
+	const float kIceIndex = 1.0f / 1.31f;
+	if (NdotD > 0.0f) {
+		refrNormal = -normal;
+		refrEta = 1.0f / kIceIndex;
+	}
+	else {
+		refrNormal = normal;
+		refrEta = kIceIndex;
+	}
+
+	vec3 origin = pos;
+	vec3 rayDir = refract(gl_WorldRayDirectionEXT, refrNormal, refrEta);
+	PrimaryRay.done = false;
+	PrimaryRay.rayOrigin = origin;
+	PrimaryRay.rayDir = rayDir;
+}*/
+
+/*
 vec3 DiffuseShade2(vec3 pos, vec3 normal, vec3 difColor, float kd, float ks, uint rndSeed)
 {
 	const float M_PI = 3.1415926536f;
@@ -164,58 +231,4 @@ vec3 DiffuseShade2(vec3 pos, vec3 normal, vec3 difColor, float kd, float ks, uin
 	}
 	// Return shaded color
 	return (NdotL * rayColor * (difColor / M_PI)) / sampleProb;
-}
-void main() {
-	PrimaryRay.isMiss = false;
-	// Object of this instance
-	const uint objId = gl_InstanceCustomIndexEXT;// scnDesc.i[gl_InstanceID].objId;
-	ShadingData hit = getHitShadingData(objId);
-	
-	if (!PrimaryRay.isIndirect)
-	{
-		PrimaryRay.color = DiffuseShade(hit.pos, hit.normal, hit.difColor, hit.kd, hit.ks);
-		PrimaryRay.normal = hit.normal;
-		PrimaryRay.pos = hit.pos;
-
-		if (hit.mat == 3)// Reflection
-		{
-			vec3 origin = hit.pos;
-			vec3 rayDir = reflect(gl_WorldRayDirectionEXT, hit.normal);
-			PrimaryRay.attenuation *= hit.ks;
-			PrimaryRay.done = false;
-			PrimaryRay.rayOrigin = origin;
-			PrimaryRay.rayDir = rayDir;
-		}
-
-		/*else if (mat == 2)
-		{
-			const float NdotD = dot(normal, gl_WorldRayDirectionEXT);
-
-			vec3 refrNormal;
-			float refrEta;
-			const float kIceIndex = 1.0f / 1.31f;
-			if (NdotD > 0.0f) {
-				refrNormal = -normal;
-				refrEta = 1.0f / kIceIndex;
-			}
-			else {
-				refrNormal = normal;
-				refrEta = kIceIndex;
-			}
-
-			vec3 origin = pos;
-			vec3 rayDir = refract(gl_WorldRayDirectionEXT, refrNormal, refrEta);
-			PrimaryRay.done = false;
-			PrimaryRay.rayOrigin = origin;
-			PrimaryRay.rayDir = rayDir;
-		}*/
-	}
-	else
-	{
-		PrimaryRay.color = DiffuseShade2(hit.pos, hit.normal, PrimaryRay.difColor, hit.kd, hit.ks, PrimaryRay.rndSeed);
-	}
-
-	//PrimaryRay.dist = gl_HitTEXT;
-	//PrimaryRay.normal = normal;
-	//PrimaryRay.isHit = true;
-}
+}*/

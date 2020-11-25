@@ -317,9 +317,9 @@ bool RayTracerApp::CreateAS(const VkAccelerationStructureTypeKHR type,
 }
 void RayTracerApp::LoadSceneGeometries() {
 
-	mScene.meshes.clear();
+	mScene.meshes.clear(); 
 	LoadSceneGeometry(sScenesFolder + "fake_whitted.obj");
-
+	//LoadSceneGeometry(sScenesFolder + "bs_ears.obj");
 	// prepare shader resources infos
 	const size_t numMeshes = mScene.meshes.size();
 	mScene.meshInfoBufferInfos.resize(numMeshes);
@@ -448,14 +448,7 @@ void RayTracerApp::LoadSceneGeometry(String fileName) {
 			}
 			else
 			{
-				colorInfo.x = getRandomFloat(0.5, 1.0);
-				colorInfo.y = getRandomFloat(0.5, 1.0);
-				colorInfo.z = getRandomFloat(0.5, 1.0);
 
-				matInfo.x = getRandomFloat(0.0, 0.5);
-				matInfo.y = getRandomFloat(0.0, 0.5);
-				matInfo.w = 0.0;
-				matInfo.z = 0.0;
 				if (shape.name == "Sphere")
 				{
 					colorInfo.x = 1;
@@ -466,8 +459,15 @@ void RayTracerApp::LoadSceneGeometry(String fileName) {
 				}
 				else
 				{
+					colorInfo.x = getRandomFloat(0.5, 1.0);
+					colorInfo.y = getRandomFloat(0.5, 1.0);
+					colorInfo.z = getRandomFloat(0.5, 1.0);
 					colorInfo.w = 1.0;
 				}
+				matInfo.x = getRandomFloat(0.3, 0.1);
+				matInfo.y = getRandomFloat(0.3, 0.1);
+				matInfo.w = 0.0;
+				matInfo.z = 0.0;
 				
 			}
 			//

@@ -5,7 +5,8 @@
 // include vec & mat types (same namings as in GLSL)
 #include "framework/common.h"
 #endif // __cplusplus
-
+#define MaxRayDepth 10
+#define MAX_PATHS 20
 //
 #define SWS_PRIMARY_HIT_SHADERS_IDX     0
 #define SWS_PRIMARY_MISS_SHADERS_IDX    0
@@ -54,7 +55,7 @@ struct RayPayload {
 	vec3 rayOrigin;
 	vec3 rayDir;
 	uint rndSeed; // current random seed
-
+	int rayDepth;
 	bool isIndirect;
 	vec3 difColor;
 };
@@ -70,7 +71,7 @@ struct VertexAttribute {
     vec4 uv;
 };
 struct ShadingData {
-	vec3 difColor;
+	vec4 difColor;
 	vec3 normal;
 	vec3 pos;
 	int mat;
