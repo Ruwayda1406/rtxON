@@ -10,6 +10,7 @@ set BINARIES_FOLDER="./shaders/"
 
 :: closest-hit shaders
 %GLSL_COMPILER% --target-env vulkan1.2 -V -S rchit %SOURCE_FOLDER%ray_chit.glsl -o %BINARIES_FOLDER%ray_chit.bin
+%GLSL_COMPILER% --target-env vulkan1.2 -V -S rchit %SOURCE_FOLDER%indirect_ray_chit.glsl -o %BINARIES_FOLDER%indirect_ray_chit.bin
 
 :: any-hit shaders
 %GLSL_COMPILER% --target-env vulkan1.2 -V -S rahit %SOURCE_FOLDER%ray_anyhit.glsl -o %BINARIES_FOLDER%ray_anyhit.bin
@@ -17,5 +18,5 @@ set BINARIES_FOLDER="./shaders/"
 :: miss shaders
 %GLSL_COMPILER% --target-env vulkan1.2 -V -S rmiss %SOURCE_FOLDER%ray_miss.glsl -o %BINARIES_FOLDER%ray_miss.bin
 %GLSL_COMPILER% --target-env vulkan1.2 -V -S rmiss %SOURCE_FOLDER%shadow_ray_miss.glsl -o %BINARIES_FOLDER%shadow_ray_miss.bin
-
+%GLSL_COMPILER% --target-env vulkan1.2 -V -S rmiss %SOURCE_FOLDER%indirect_ray_miss.glsl -o %BINARIES_FOLDER%indirect_ray_miss.bin
 pause

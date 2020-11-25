@@ -11,6 +11,8 @@
 #define SWS_PRIMARY_MISS_SHADERS_IDX    0
 #define SWS_SHADOW_HIT_SHADERS_IDX      1
 #define SWS_SHADOW_MISS_SHADERS_IDX     1
+#define SWS_INDIRECT_HIT_SHADERS_IDX    2
+#define SWS_INDIRECT_MISS_SHADERS_IDX    2
 ///////////////////////////////////////////
 // resource locations
 #define SWS_SCENE_AS_SET                0
@@ -36,6 +38,7 @@
 #define SWS_LOC_PRIMARY_RAY             0
 #define SWS_LOC_HIT_ATTRIBS             1
 #define SWS_LOC_SHADOW_RAY              2
+#define SWS_LOC_INDIRECT_RAY            3
 
 #define SWS_MAX_RECURSION               10
 //////////////////////////////////////////
@@ -48,10 +51,13 @@ struct RayPayload {
 	bool done;
 	vec3 rayOrigin;
 	vec3 rayDir;
-	uint rndSeed; // current random seed
+	//uint rndSeed; // current random seed
 
 };
-
+struct IndirectRayPayload {
+	vec3 color;
+	uint rndSeed; // current random seed
+};
 struct ShadowRayPayload {
 	bool isShadowed;
 };

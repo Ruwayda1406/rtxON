@@ -40,14 +40,14 @@ using quat = glm::highp_quat;
 using uint = glm::highp_uint32_t;
 struct Recti { int left, top, right, bottom; };
 
-static const float MM_Pi = 3.1415926536f;
+static const float M_PI = 3.1415926536f;
 
 inline float Rad2Deg(const float rad) {
-    return rad * (180.0f / MM_Pi);
+    return rad * (180.0f / M_PI);
 }
 
 inline float Deg2Rad(const float deg) {
-    return deg * (MM_Pi / 180.0f);
+    return deg * (M_PI / 180.0f);
 }
 glm::vec3 inline getRandomVec3(float min, float max)
 {
@@ -89,6 +89,10 @@ inline T Clamp(const T& v, const T& minV, const T& maxV) {
     return (v < minV) ? minV : ((v > maxV) ? maxV : v);
 }
 
+template<typename T>
+inline T Saturate(T val, T mn, T mx) {
+	return min(max(val, mn), mx);
+}
 // these funcs should be compatible with same in GLSL
 template <typename T>
 inline float Length(const T& v) { return glm::length(v); }

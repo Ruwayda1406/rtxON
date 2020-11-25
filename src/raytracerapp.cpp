@@ -796,7 +796,10 @@ void RayTracerApp::CreateRaytracingPipelineAndSBT() {
     rayChitShader.LoadFromFile((sShadersFolder + "ray_chit.bin").c_str());
     rayAhitShader.LoadFromFile((sShadersFolder + "ray_anyhit.bin").c_str());
 	rayMissShader.LoadFromFile((sShadersFolder + "ray_miss.bin").c_str());
-	shadowMiss.LoadFromFile((sShadersFolder + "shadow_ray_miss.bin").c_str());
+	shadowMiss.LoadFromFile((sShadersFolder + "shadow_ray_miss.bin").c_str());//indirect_ray_chit
+	//	rayIndirectChitShader.LoadFromFile((sShadersFolder + "indirect_ray_chit.bin").c_str());
+	//rayIndirectMissShader.LoadFromFile((sShadersFolder + "indirect_ray_miss.bin").c_str());
+
 
     mShaderBindingTable.Initialize(1,2, mRTProps.shaderGroupHandleSize, mRTProps.shaderGroupBaseAlignment);
     mShaderBindingTable.SetRaygenStage(rayGenShader.GetShaderStage(VK_SHADER_STAGE_RAYGEN_BIT_KHR));
@@ -806,6 +809,11 @@ void RayTracerApp::CreateRaytracingPipelineAndSBT() {
 
 	mShaderBindingTable.AddStageToMissGroup(rayMissShader.GetShaderStage(VK_SHADER_STAGE_MISS_BIT_KHR), SWS_PRIMARY_MISS_SHADERS_IDX);
 	mShaderBindingTable.AddStageToMissGroup(shadowMiss.GetShaderStage(VK_SHADER_STAGE_MISS_BIT_KHR), SWS_SHADOW_MISS_SHADERS_IDX);
+
+
+	//	mShaderBindingTable.AddStageToMissGroup(rayIndirectChitShader.GetShaderStage(VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR), SWS_INDIRECT_HIT_SHADERS_IDX);
+		//mShaderBindingTable.AddStageToMissGroup(rayIndirectMissShader.GetShaderStage(VK_SHADER_STAGE_MISS_BIT_KHR), SWS_INDIRECT_MISS_SHADERS_IDX);
+
 
     VkRayTracingPipelineCreateInfoKHR rayPipelineInfo = {};
     rayPipelineInfo.sType = VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR;

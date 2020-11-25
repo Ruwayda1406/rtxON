@@ -74,15 +74,13 @@ ShadingData getHitShadingData(uint objId)
 
 	return closestHit;
 }
-bool shootColorRay(vec3 shadowRayOrigin, vec3 shadowRayDirection, float min, float max)
+bool shootShadowRay(vec3 shadowRayOrigin, vec3 dirToLight, float min, float distToLight)
 {
-	float lightDistance = max;
-
 	const uint shadowRayFlags = gl_RayFlagsOpaqueEXT | gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT;
 	const uint cullMask = 0xFF;
 	const uint stbRecordStride = 1;
-	const float tmin = 0.001;
-	const float tmax = lightDistance;
+	const float tmin = min;
+	const float tmax = distToLight;
 	ShadowRay.isShadowed = true;
 	traceRayEXT(Scene,
 		shadowRayFlags,
@@ -92,18 +90,14 @@ bool shootColorRay(vec3 shadowRayOrigin, vec3 shadowRayDirection, float min, flo
 		SWS_SHADOW_MISS_SHADERS_IDX,
 		shadowRayOrigin,
 		0.0f,
-		shadowRayDirection,
+		dirToLight,
 		tmax,
 		SWS_LOC_SHADOW_RAY);
 	return ShadowRay.isShadowed;
 
 }
-vec3 DiffuseShade(vec3 pos, vec3 normal, vec3 difColor, float kd,float ks,int mat, uint rndSeed)
+vec3 DiffuseShade(vec3 pos, vec3 normal, vec3 difColor, float kd,float ks)
 {
-
-	
-	
-
 	vec3 hitValues = vec3(0);
 	for (int i = 0; i < Params.LightInfo.x; i++)//SoftShadows
 	{
@@ -114,7 +108,7 @@ vec3 DiffuseShade(vec3 pos, vec3 normal, vec3 difColor, float kd,float ks,int ma
 
 		const vec3 shadowRayOrigin = pos + normal * 0.001f;
 
-		bool isShadowed = shootColorRay(shadowRayOrigin, toLight, 0.001, 100000.0);
+		bool isShadowed = shootShadowRay(shadowRayOrigin, toLight, 0.001, 100000.0);
 		float lighting;
 		if (isShadowed)
 		{
@@ -131,15 +125,27 @@ vec3 DiffuseShade(vec3 pos, vec3 normal, vec3 difColor, float kd,float ks,int ma
 	vec3 finalcolor = hitValues / Params.LightInfo.x;
 
 
-	if (mat == 3)// Reflection
+	return finalcolor;
+}
+void main() {
+	
+	// Object of this instance
+	const uint objId = gl_InstanceCustomIndexEXT;// scnDesc.i[gl_InstanceID].objId;
+	ShadingData hit = getHitShadingData(objId);
+	
+	PrimaryRay.color = DiffuseShade(hit.pos, hit.normal, hit.difColor, hit.kd,hit.ks);
+
+
+	if (hit.mat == 3)// Reflection
 	{
-		vec3 origin = pos;
-		vec3 rayDir = reflect(gl_WorldRayDirectionEXT, normal);
-		PrimaryRay.attenuation *= ks;
+		vec3 origin = hit.pos;
+		vec3 rayDir = reflect(gl_WorldRayDirectionEXT, hit.normal);
+		PrimaryRay.attenuation *= hit.ks;
 		PrimaryRay.done = false;
 		PrimaryRay.rayOrigin = origin;
 		PrimaryRay.rayDir = rayDir;
 	}
+
 	/*else if (mat == 2)
 	{
 		const float NdotD = dot(normal, gl_WorldRayDirectionEXT);
@@ -162,21 +168,7 @@ vec3 DiffuseShade(vec3 pos, vec3 normal, vec3 difColor, float kd,float ks,int ma
 		PrimaryRay.rayOrigin = origin;
 		PrimaryRay.rayDir = rayDir;
 	}*/
-	return finalcolor;
-}
-void main() {
-	
-	// Object of this instance
-	const uint objId = gl_InstanceCustomIndexEXT;// scnDesc.i[gl_InstanceID].objId;
-	ShadingData hit = getHitShadingData(objId);
-	
-	PrimaryRay.color = DiffuseShade(hit.pos, hit.normal, hit.difColor, hit.kd,hit.ks,hit.mat, PrimaryRay.rndSeed);
-
 	//PrimaryRay.dist = gl_HitTEXT;
 	//PrimaryRay.normal = normal;
 	//PrimaryRay.isHit = true;
 }
-
-/*
-vec3 DiffuseShade(vec3 pos, vec3 normal, vec3 difColor, float kd,float ks,int mat, uint rndSeed)
-{*/

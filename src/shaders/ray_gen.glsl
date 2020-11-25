@@ -17,7 +17,7 @@ layout(set = SWS_UNIFORMPARAMS_SET, binding = SWS_UNIFORMPARAMS_BINDING, std140)
 };
 
 layout(location = SWS_LOC_PRIMARY_RAY) rayPayloadEXT RayPayload PrimaryRay;
-
+layout(location = SWS_LOC_INDIRECT_RAY) rayPayloadEXT IndirectRayPayload indirectRay;
 vec3 CalcRayDir(vec2 pixel, float aspect) {
 
 	vec3 w = Camera.dir.xyz;
@@ -36,7 +36,7 @@ void main() {
 
 	// Initialize the random number
 	uint rndSeed = tea(gl_LaunchIDEXT.y * gl_LaunchSizeEXT.x + gl_LaunchIDEXT.x, int(Params.modeFrame.y));
-	PrimaryRay.rndSeed = rndSeed;
+	indirectRay.rndSeed = rndSeed;
 
 	vec3 hitValues = vec3(0);
 	int NBSAMPLES = 20;	// monte carlo antialiasing
