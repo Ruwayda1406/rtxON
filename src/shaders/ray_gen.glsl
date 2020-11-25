@@ -17,7 +17,6 @@ layout(set = SWS_UNIFORMPARAMS_SET, binding = SWS_UNIFORMPARAMS_BINDING, std140)
 };
 
 layout(location = SWS_LOC_PRIMARY_RAY) rayPayloadEXT RayPayload PrimaryRay;
-layout(location = SWS_LOC_INDIRECT_RAY) rayPayloadEXT IndirectRayPayload indirectRay;
 vec3 CalcRayDir(vec2 pixel, float aspect) {
 
 	vec3 w = Camera.dir.xyz;
@@ -32,12 +31,56 @@ vec3 CalcRayDir(vec2 pixel, float aspect) {
 	const vec3 rayDir = normalize(w + (u * pixel.x) - (v * pixel.y));
 	return rayDir;
 }
+vec3 shootColorRay(vec3 rayOrigin, vec3 rayDirection, float min, float max)
+{
+	const uint rayFlags = gl_RayFlagsNoOpaqueEXT;// gl_RayFlagsNoneEXT; ;// gl_RayFlagsOpaqueEXT;
+
+	const uint cullMask = 0xFF;
+	const uint stbRecordStride = 1;
+	const float tmin = min;
+	const float tmax = max;// Camera.nearFarFov.y;
+
+	PrimaryRay.done = true;
+	PrimaryRay.rayOrigin = rayOrigin.xyz;
+	PrimaryRay.rayDir = rayDirection.xyz;
+	PrimaryRay.color = vec3(0);
+	PrimaryRay.attenuation = 1.f;
+	PrimaryRay.accColor = vec4(0);
+
+	vec3 hitValue = vec3(0);
+	for (int i = 0; i < SWS_MAX_RECURSION; i++)
+	{
+		traceRayEXT(Scene,
+			rayFlags,
+			cullMask,
+			SWS_PRIMARY_HIT_SHADERS_IDX,
+			stbRecordStride,
+			SWS_PRIMARY_MISS_SHADERS_IDX,
+			rayOrigin,
+			tmin,
+			rayDirection,
+			tmax,
+			SWS_LOC_PRIMARY_RAY);
+
+		hitValue += PrimaryRay.color * PrimaryRay.attenuation;
+
+		if (PrimaryRay.done)
+			break;
+
+		rayOrigin = PrimaryRay.rayOrigin;
+		rayDirection = PrimaryRay.rayDir;
+		PrimaryRay.done = true;  // Will stop if a reflective material isn't hit
+		PrimaryRay.accColor = vec4(0);
+	}
+	return hitValue;
+
+}
 void main() {
 
+	// First:: // Do diffuse shading at the primary hit
 	// Initialize the random number
 	uint rndSeed = tea(gl_LaunchIDEXT.y * gl_LaunchSizeEXT.x + gl_LaunchIDEXT.x, int(Params.modeFrame.y));
-	indirectRay.rndSeed = rndSeed;
-
+	PrimaryRay.isIndirect = false;
 	vec3 hitValues = vec3(0);
 	int NBSAMPLES = 20;	// monte carlo antialiasing
 	for (int smpl = 0; smpl < NBSAMPLES; smpl++)
@@ -58,51 +101,28 @@ void main() {
 		vec3 origin = Camera.pos.xyz;
 		//ray direction;
 		vec3 direction = CalcRayDir(pixel, aspect);
+		vec3  hitValue = shootColorRay(origin, direction, 0.0001, 10000.0);
+		hitValues += hitValue;
 
-		const uint rayFlags = gl_RayFlagsNoOpaqueEXT;// gl_RayFlagsNoneEXT; ;// gl_RayFlagsOpaqueEXT;
-
-		const uint cullMask = 0xFF;
-		const uint stbRecordStride = 1;
-		const float tmin = 0.001;
-		const float tmax = 10000.0;// Camera.nearFarFov.y;
-
-	
-
-		PrimaryRay.done = true;
-		PrimaryRay.rayOrigin = origin.xyz;
-		PrimaryRay.rayDir = direction.xyz;
-		PrimaryRay.color = vec3(0);
-		PrimaryRay.attenuation = 1.f;
-		PrimaryRay.accColor = vec4(0);
-
-		for (int i=0;i< SWS_MAX_RECURSION;i++)
-		{
-			traceRayEXT(Scene,
-				rayFlags,
-				cullMask,
-				SWS_PRIMARY_HIT_SHADERS_IDX,
-				stbRecordStride,
-				SWS_PRIMARY_MISS_SHADERS_IDX,
-				origin,
-				tmin,
-				direction,
-				tmax,
-				SWS_LOC_PRIMARY_RAY);
-
-
-			hitValues += PrimaryRay.color * PrimaryRay.attenuation;
-
-			if (PrimaryRay.done)
-				break;
-
-			origin = PrimaryRay.rayOrigin;
-			direction = PrimaryRay.rayDir;
-			PrimaryRay.done = true;  // Will stop if a reflective material isn't hit
-			PrimaryRay.accColor = vec4(0);
-		}
 	}
-	vec3 finalColor = hitValues / NBSAMPLES;
+	vec3 difColor = hitValues / NBSAMPLES;
+	vec3 wsNorm = PrimaryRay.normal;
+	vec3 wsPos = PrimaryRay.pos;
+	//Second:: global illumination indirect ray
+	// Do indirect
+	PrimaryRay.rndSeed = rndSeed;
+	PrimaryRay.isIndirect = true;
+	PrimaryRay.difColor = difColor;
+	
+	// Pick random direction for global illumination indirect ray; shoot ray
+	//vec3 giDir = getCosWeightedRandomDir(rndSeed, wsNorm);
+	//vec3 giColor = shootColorRay(wsPos, giDir, 0.0001, randSeed);
+	// Accumulate properly weighted result into final color
+    // Due to cosine-weighting, terms cancel, leaving simpler equation
+	vec3 color = vec3(0);
+	//color += difColor * giColor;
 
+	//Finally :::save the color ///////////////////////
 	// Do accumulation over time
 	/*if (int(Params.modeFrame.y) >= 0)
 	{
@@ -113,6 +133,6 @@ void main() {
 	else*/
 	{
 		//imageStore(ResultImage, ivec2(gl_LaunchIDEXT.xy), vec4((finalColor), 1.f));
-		imageStore(ResultImage, ivec2(gl_LaunchIDEXT.xy), vec4(LinearToSrgb(finalColor), 1.f));
+		imageStore(ResultImage, ivec2(gl_LaunchIDEXT.xy), vec4(LinearToSrgb(difColor), 1.f));
 	}
 }

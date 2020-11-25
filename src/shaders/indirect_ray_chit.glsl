@@ -138,8 +138,5 @@ void main() {
 	// Object of this instance
 	const uint objId = gl_InstanceCustomIndexEXT;// scnDesc.i[gl_InstanceID].objId;
 	ShadingData hit = getHitShadingData(objId);
-	
 	indirectRay.color = DiffuseShade2(hit.pos, hit.normal, hit.difColor, hit.kd,hit.ks, indirectRay.rndSeed);
-
-
 }

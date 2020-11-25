@@ -127,47 +127,88 @@ vec3 DiffuseShade(vec3 pos, vec3 normal, vec3 difColor, float kd,float ks)
 
 	return finalcolor;
 }
+vec3 DiffuseShade2(vec3 pos, vec3 normal, vec3 difColor, float kd, float ks, uint rndSeed)
+{
+	const float M_PI = 3.1415926536f;
+	int LightsCount = int(Params.LightInfo.x);
+	// We will only shoot one shadow ray per frame, randomly to a light
+	uint randomLight = uint(nextRand(rndSeed) * LightsCount);
+	// What is the probability we picked that light?
+	float sampleProb = 1.0f / float(LightsCount);
+
+	// Get information about this light; access your framework’s scene structs
+	vec3 lightIntensity = vec3(Params.LightSource[randomLight].w);
+	vec3 lightPos = Params.LightSource[randomLight].xyz;
+	float distToLight = length(lightPos - pos);
+	vec3 dirToLight = normalize(lightPos - pos);
+	// Compute our NdotL term; shoot our shadow ray in selected direction
+	// Compute our NdotL term; shoot our shadow ray in selected direction
+	float NdotL = clamp(dot(normal, dirToLight), 0.0, 1.0); // In range [0..1]
+	bool isLit = shootShadowRay(pos, dirToLight, 0.0001, distToLight);
+	vec3 rayColor;
+
+	if (isLit)
+	{
+		rayColor = lightIntensity;
+	}
+	else
+	{
+		rayColor = vec3(0.0);
+
+	}
+	// Return shaded color
+	return (NdotL * rayColor * (difColor / M_PI)) / sampleProb;
+}
 void main() {
 	
 	// Object of this instance
 	const uint objId = gl_InstanceCustomIndexEXT;// scnDesc.i[gl_InstanceID].objId;
 	ShadingData hit = getHitShadingData(objId);
 	
-	PrimaryRay.color = DiffuseShade(hit.pos, hit.normal, hit.difColor, hit.kd,hit.ks);
-
-
-	if (hit.mat == 3)// Reflection
+	if (!PrimaryRay.isIndirect)
 	{
-		vec3 origin = hit.pos;
-		vec3 rayDir = reflect(gl_WorldRayDirectionEXT, hit.normal);
-		PrimaryRay.attenuation *= hit.ks;
-		PrimaryRay.done = false;
-		PrimaryRay.rayOrigin = origin;
-		PrimaryRay.rayDir = rayDir;
+		PrimaryRay.color = DiffuseShade(hit.pos, hit.normal, hit.difColor, hit.kd, hit.ks);
+		PrimaryRay.normal = hit.normal;
+		PrimaryRay.pos = hit.pos;
+
+		if (hit.mat == 3)// Reflection
+		{
+			vec3 origin = hit.pos;
+			vec3 rayDir = reflect(gl_WorldRayDirectionEXT, hit.normal);
+			PrimaryRay.attenuation *= hit.ks;
+			PrimaryRay.done = false;
+			PrimaryRay.rayOrigin = origin;
+			PrimaryRay.rayDir = rayDir;
+		}
+
+		/*else if (mat == 2)
+		{
+			const float NdotD = dot(normal, gl_WorldRayDirectionEXT);
+
+			vec3 refrNormal;
+			float refrEta;
+			const float kIceIndex = 1.0f / 1.31f;
+			if (NdotD > 0.0f) {
+				refrNormal = -normal;
+				refrEta = 1.0f / kIceIndex;
+			}
+			else {
+				refrNormal = normal;
+				refrEta = kIceIndex;
+			}
+
+			vec3 origin = pos;
+			vec3 rayDir = refract(gl_WorldRayDirectionEXT, refrNormal, refrEta);
+			PrimaryRay.done = false;
+			PrimaryRay.rayOrigin = origin;
+			PrimaryRay.rayDir = rayDir;
+		}*/
+	}
+	else
+	{
+		PrimaryRay.color = DiffuseShade2(hit.pos, hit.normal, PrimaryRay.difColor, hit.kd, hit.ks, PrimaryRay.rndSeed);
 	}
 
-	/*else if (mat == 2)
-	{
-		const float NdotD = dot(normal, gl_WorldRayDirectionEXT);
-
-		vec3 refrNormal;
-		float refrEta;
-		const float kIceIndex = 1.0f / 1.31f;
-		if (NdotD > 0.0f) {
-			refrNormal = -normal;
-			refrEta = 1.0f / kIceIndex;
-		}
-		else {
-			refrNormal = normal;
-			refrEta = kIceIndex;
-		}
-
-		vec3 origin = pos;
-		vec3 rayDir = refract(gl_WorldRayDirectionEXT, refrNormal, refrEta);
-		PrimaryRay.done = false;
-		PrimaryRay.rayOrigin = origin;
-		PrimaryRay.rayDir = rayDir;
-	}*/
 	//PrimaryRay.dist = gl_HitTEXT;
 	//PrimaryRay.normal = normal;
 	//PrimaryRay.isHit = true;

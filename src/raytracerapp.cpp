@@ -791,14 +791,14 @@ void RayTracerApp::CreateRaytracingPipelineAndSBT() {
 	VkResult error = vkCreatePipelineLayout(mDevice, &pipelineLayoutCreateInfo, nullptr, &mRTPipelineLayout);
 	CHECK_VK_ERROR(error, "vkCreatePipelineLayout");
 
-	vulkanhelpers::Shader rayGenShader, rayChitShader, rayMissShader, rayAhitShader, shadowMiss;
+	vulkanhelpers::Shader rayGenShader, rayChitShader, rayMissShader, rayAhitShader, shadowMiss;// indirectChitShader, indirectMissShader;
     rayGenShader.LoadFromFile((sShadersFolder + "ray_gen.bin").c_str());
     rayChitShader.LoadFromFile((sShadersFolder + "ray_chit.bin").c_str());
     rayAhitShader.LoadFromFile((sShadersFolder + "ray_anyhit.bin").c_str());
 	rayMissShader.LoadFromFile((sShadersFolder + "ray_miss.bin").c_str());
 	shadowMiss.LoadFromFile((sShadersFolder + "shadow_ray_miss.bin").c_str());//indirect_ray_chit
-	//	rayIndirectChitShader.LoadFromFile((sShadersFolder + "indirect_ray_chit.bin").c_str());
-	//rayIndirectMissShader.LoadFromFile((sShadersFolder + "indirect_ray_miss.bin").c_str());
+	//indirectChitShader.LoadFromFile((sShadersFolder + "indirect_ray_chit.bin").c_str());
+	//indirectMissShader.LoadFromFile((sShadersFolder + "indirect_ray_miss.bin").c_str());
 
 
     mShaderBindingTable.Initialize(1,2, mRTProps.shaderGroupHandleSize, mRTProps.shaderGroupBaseAlignment);
@@ -811,8 +811,8 @@ void RayTracerApp::CreateRaytracingPipelineAndSBT() {
 	mShaderBindingTable.AddStageToMissGroup(shadowMiss.GetShaderStage(VK_SHADER_STAGE_MISS_BIT_KHR), SWS_SHADOW_MISS_SHADERS_IDX);
 
 
-	//	mShaderBindingTable.AddStageToMissGroup(rayIndirectChitShader.GetShaderStage(VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR), SWS_INDIRECT_HIT_SHADERS_IDX);
-		//mShaderBindingTable.AddStageToMissGroup(rayIndirectMissShader.GetShaderStage(VK_SHADER_STAGE_MISS_BIT_KHR), SWS_INDIRECT_MISS_SHADERS_IDX);
+	//mShaderBindingTable.AddStageToMissGroup(indirectChitShader.GetShaderStage(VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR), SWS_INDIRECT_HIT_SHADERS_IDX);
+	//mShaderBindingTable.AddStageToMissGroup(indirectMissShader.GetShaderStage(VK_SHADER_STAGE_MISS_BIT_KHR), SWS_INDIRECT_MISS_SHADERS_IDX);
 
 
     VkRayTracingPipelineCreateInfoKHR rayPipelineInfo = {};

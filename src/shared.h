@@ -46,13 +46,16 @@ struct RayPayload {
 	vec4 accColor;// used in anyhit
     vec3 color;
     vec3 normal;
+	vec3 pos;
 	float dist;
 	float attenuation;
 	bool done;
 	vec3 rayOrigin;
 	vec3 rayDir;
-	//uint rndSeed; // current random seed
+	uint rndSeed; // current random seed
 
+	bool isIndirect;
+	vec3 difColor;
 };
 struct IndirectRayPayload {
 	vec3 color;
@@ -65,7 +68,6 @@ struct VertexAttribute {
     vec4 normal;
     vec4 uv;
 };
-
 struct ShadingData {
 	vec3 difColor;
 	vec3 normal;
