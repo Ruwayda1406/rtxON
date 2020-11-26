@@ -33,7 +33,7 @@ vec3 CalcRayDir(vec2 pixel, float aspect) {
 }
 vec3 shootColorRay(vec3 rayOrigin, vec3 rayDirection, float min, float max, uint rndSeed)
 {
-	const uint rayFlags = gl_RayFlagsNoOpaqueEXT;// gl_RayFlagsNoneEXT; ;// gl_RayFlagsOpaqueEXT;
+	const uint rayFlags = gl_RayFlagsOpaqueEXT;// gl_RayFlagsNoneEXT; ;// gl_RayFlagsOpaqueEXT;
 
 	const uint cullMask = 0xFF;
 	const uint stbRecordStride = 1;
@@ -46,9 +46,10 @@ vec3 shootColorRay(vec3 rayOrigin, vec3 rayDirection, float min, float max, uint
 	PrimaryRay.color = vec3(0);
 	PrimaryRay.attenuation = 1.f;
 	PrimaryRay.accColor = vec4(0);
+	PrimaryRay.rndSeed = rndSeed;
 
 	vec3 hitValue = vec3(0);
-	for (int i = 0; i < SWS_MAX_RECURSION; i++)
+	for (int i = 0; i < SWS_MAX_RECURSION; i++)//for reflective material 
 	{
 		traceRayEXT(Scene,
 			rayFlags,
@@ -75,105 +76,81 @@ vec3 shootColorRay(vec3 rayOrigin, vec3 rayDirection, float min, float max, uint
 	return hitValue;
 
 }
-vec3 getCosWeightedRandomDir(float r1, float r2, vec3 hitNormal)
-{
-	vec3 Nt, Nb;
-	if (abs(hitNormal.x) > abs(hitNormal.y))
-		Nt = normalize(vec3(hitNormal.z, 0, -hitNormal.x) / sqrt(hitNormal.x * hitNormal.x + hitNormal.z * hitNormal.z));
-	else
-		Nt = normalize(vec3(0, -hitNormal.z, hitNormal.y) / sqrt(hitNormal.y * hitNormal.y + hitNormal.z * hitNormal.z));
-	Nb = cross(hitNormal, Nt);
-
-	vec3 samp = uniformSampleHemisphere(r1, r2);
-	vec3 giDir = vec3((samp.x * Nb.x + samp.y * hitNormal.x + samp.z * Nt.x),
-		(samp.x * Nb.y + samp.y * hitNormal.y + samp.z * Nt.y),
-		(samp.x * Nb.z + samp.y * hitNormal.z + samp.z * Nt.z));
-	return normalize(giDir);
-}
 void main() {
+	int mode = int(Params.modeFrame.x);
+	float deltaTime = Params.modeFrame.y;
 
-	// First:: // Do diffuse shading at the primary hit
-	// Initialize the random number
-	uint rndSeed = tea(gl_LaunchIDEXT.y * gl_LaunchSizeEXT.x + gl_LaunchIDEXT.x, int(Params.modeFrame.y));
+	////////////////////  directLighting ///////////////////////////////////////
+	// First:: Do diffuse shading at the primary hit
+	uint rndSeed = tea(gl_LaunchIDEXT.y * gl_LaunchSizeEXT.x + gl_LaunchIDEXT.x, int(deltaTime));
+	
+	vec3 color;
 	PrimaryRay.isIndirect = false;
+	// monte carlo antialiasing
 	vec3 hitValues = vec3(0);
-	int NBSAMPLES = 20;	// monte carlo antialiasing
-	for (int smpl = 0; smpl < NBSAMPLES; smpl++)
+	for (int smpl = 0; smpl < max_antialiasing_iter; smpl++)
 	{
 		float r1 = nextRand(rndSeed);
 		float r2 = nextRand(rndSeed);
 		// Subpixel jitter: send the ray through a different position inside the pixel
 		// each time, to provide antialiasing.
-		vec2 subpixel_jitter = int(Params.modeFrame.y) == 0 ? vec2(0.5f, 0.5f) : vec2(r1, r2);
-
-		const vec2 uv = vec2(gl_LaunchIDEXT.xy) + subpixel_jitter;
+		const vec2 uv = vec2(gl_LaunchIDEXT.xy) + vec2(r1, r2);
 		const vec2 pixel = uv / (gl_LaunchSizeEXT.xy - 1.0);
 		const float aspect = float(gl_LaunchSizeEXT.x) / float(gl_LaunchSizeEXT.y);
 
 
 		// Initialize a ray structure for our ray tracer
-		//ray origin
 		vec3 origin = Camera.pos.xyz;
-		//ray direction;
 		vec3 direction = CalcRayDir(pixel, aspect);
 		vec3  hitValue = shootColorRay(origin, direction, 0.0001, 10000.0, rndSeed);
 		hitValues += hitValue;
 
 	}
-	vec3 directLighting = hitValues / NBSAMPLES;
-	vec3 color;
-	if (PrimaryRay.isMiss == true)
+	vec3 directLighting = hitValues / max_antialiasing_iter;
+	color = directLighting;
+		
+	
+	if(mode==2)  /////////////////////// indirectLigthing ///////////////////////////////////////
 	{
-		color = directLighting;
-	}
-	else
-	{
-		vec3 hitNormal = PrimaryRay.normal;
-		vec3 hitPos = PrimaryRay.pos;
-		//Second:: global illumination indirect ray
-		// Do indirect
 		PrimaryRay.rndSeed = rndSeed;
 		PrimaryRay.isIndirect = true;
-		PrimaryRay.rayDepth = 0;
-		// Pick random direction for global illumination indirect ray; shoot ray
-		vec3 indirectLigthing = vec3(0);
-		///////////////////////////////////////////////////////
+		const vec2 uv = vec2(gl_LaunchIDEXT.xy);
+		const vec2 pixel = uv / (gl_LaunchSizeEXT.xy - 1.0);
+		const float aspect = float(gl_LaunchSizeEXT.x) / float(gl_LaunchSizeEXT.y);
+
+
+		// Initialize a ray structure for our ray tracer
+		vec3 origin = Camera.pos.xyz;
+		vec3 direction = CalcRayDir(pixel, aspect);
+		vec3 pathsColor = vec3(0);
+		int hits = 0;
+		////////////////// path tracing ////////////////////////
 		for (int p = 0; p < MAX_PATHS; p++)
 		{
-			PrimaryRay.rayOrigin = hitPos;
-			PrimaryRay.normal = hitNormal;
+			PrimaryRay.weight = vec3(0);
 			PrimaryRay.rayDepth = 0;
-			PrimaryRay.difColor = directLighting;
-			PrimaryRay.color = vec3(0);
-			for (;;)
+			PrimaryRay.rayOrigin = origin.xyz;
+			PrimaryRay.rayDir = direction.xyz;
+			vec3 curWeight = vec3(1);
+			for (; PrimaryRay.rayDepth < MaxRayDepth; PrimaryRay.rayDepth++)
 			{
-				float r1 = nextRand(rndSeed);
-				float r2 = nextRand(rndSeed);
-				vec3 giDir = getCosWeightedRandomDir(r1, r2, PrimaryRay.normal);
-				vec3 giColor = shootColorRay(PrimaryRay.rayOrigin, giDir, 0.0001, 10000.0, rndSeed);
-				indirectLigthing += directLighting * giColor;
-				if (PrimaryRay.done)
-				{
-					break;
-				}
+				vec3 value = shootColorRay(PrimaryRay.rayOrigin, PrimaryRay.rayDir, 0.0001, 10000.0, rndSeed);
+				pathsColor += value * curWeight;
+				curWeight *= PrimaryRay.weight;
 			}
-			
 		}
 		/////////////////////////////////////////////////////////////////////
-		color = indirectLigthing / float(MAX_PATHS);
+		color *= pathsColor / float(MAX_PATHS);
 	}
-
-	//Finally :::save the color ///////////////////////
-	// Do accumulation over time
-	/*if (int(Params.modeFrame.y) >= 0)
-	{
-		float a = 1.0f / float(Params.modeFrame.y + 1.0);
-		vec3  old_color = imageLoad(ResultImage, ivec2(gl_LaunchIDEXT.xy)).xyz;
-		imageStore(ResultImage, ivec2(gl_LaunchIDEXT.xy), vec4(mix(old_color, color, a), 1.f));
-	}
-	else*/
-	{
-		//imageStore(ResultImage, ivec2(gl_LaunchIDEXT.xy), vec4((finalColor), 1.f));
-		imageStore(ResultImage, ivec2(gl_LaunchIDEXT.xy), vec4((color), 1.f));
-	}
+	imageStore(ResultImage, ivec2(gl_LaunchIDEXT.xy), vec4(color, 1.f));
 }
+
+/*
+const vec2 pixelCenter = vec2(gl_LaunchIDEXT.xy) + vec2(0.5);
+  const vec2 inUV        = pixelCenter / vec2(gl_LaunchSizeEXT.xy);
+  vec2       d           = inUV * 2.0 - 1.0;
+
+  vec4 origin    = cam.viewInverse * vec4(0, 0, 0, 1);
+  vec4 target    = cam.projInverse * vec4(d.x, d.y, 1, 1);
+  vec4 direction = cam.viewInverse * vec4(normalize(target.xyz), 0);
+*/

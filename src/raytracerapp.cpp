@@ -9,7 +9,8 @@ static const String sScenesFolder = "_data/scenes/";
 
 static vec4 backgroundColor = vec4(0.7 , 0.8 , 1.0,1.0);
 static vec4 planeColor = vec4(0.7 , 0.8 , 0.5,1.0);
-static int mode = 0;
+static int mode = 1;
+static int lightType = 9;
 static const float sMoveSpeed = 2.0f;
 static const float sRotateSpeed = 0.25f;
 
@@ -94,8 +95,8 @@ void RayTracerApp::updateUniformParams(const float deltaTime) {
 	{
 		params->LightSource[i] = mLight.LightSource[i];
 	}
-	params->LightInfo = vec4(mLight.size, mLight.ShadowAttenuation,0,0);
-	params->modeFrame= vec4(mode,floor(deltaTime*100.0),0.0,0.0);
+	params->LightInfo = vec4(mLight.size, mLight.ShadowAttenuation, lightType,0);
+	params->modeFrame= vec4(mode,floor(deltaTime*10.0),0.0,0.0);
 	mUniformParamsBuffer.Unmap();
 }
 void RayTracerApp::FreeResources() {
@@ -182,7 +183,8 @@ void RayTracerApp::OnKey(const int key, const int scancode, const int action, co
 		switch (key) {
 		case GLFW_KEY_1: mode = 1; break;
 		case GLFW_KEY_2: mode = 2; break;
-		case GLFW_KEY_3: mode = 3; break;
+		case GLFW_KEY_0: lightType = 0; break;
+		case GLFW_KEY_9: lightType = 9; break;
 		case GLFW_KEY_W: mWKeyDown = false; break;
 		case GLFW_KEY_A: mAKeyDown = false; break;
 		case GLFW_KEY_S: mSKeyDown = false; break;
@@ -434,7 +436,7 @@ void RayTracerApp::LoadSceneGeometry(String fileName) {
 
 			vec4& colorInfo = infos[0];//random rgb color
 			vec4& matInfo = infos[1];	// mat diffuse , specular
-			if (shape.name == "Plane")
+			if (shape.name == "Plane Mesh")
 			{
 				colorInfo.x = planeColor.r;
 				colorInfo.y = planeColor.g;
@@ -443,19 +445,36 @@ void RayTracerApp::LoadSceneGeometry(String fileName) {
 
 				matInfo.x = 0.2;
 				matInfo.y = 0.2;
+				matInfo.z = 0.0;
+				matInfo.w = 0.0;
+			}
+			else if (shape.name == "Plane2 Mesh")
+			{
+				colorInfo.x = 1.0;
+				colorInfo.y = 1.0;
+				colorInfo.z = 1.0;
+				colorInfo.w = 1.0;// alpha 
+
+				matInfo.x = 0.5;
+				matInfo.y = 0.5;
 				matInfo.z = 3.0;//reflect
 				matInfo.w = 0.0;
 			}
 			else
 			{
+				matInfo.x = getRandomFloat(0.3, 0.1);
+				matInfo.y = getRandomFloat(0.3, 0.1);
+				matInfo.z = 0.0;
+				matInfo.w = 0.0;
+				
 
-				if (shape.name == "Sphere")
+				if (shape.name == "Square")
 				{
 					colorInfo.x = 1;
 					colorInfo.y = 0;
 					colorInfo.z = 0;
 					colorInfo.w = 0.9;// alpha 
-
+					
 				}
 				else
 				{
@@ -464,10 +483,6 @@ void RayTracerApp::LoadSceneGeometry(String fileName) {
 					colorInfo.z = getRandomFloat(0.5, 1.0);
 					colorInfo.w = 1.0;
 				}
-				matInfo.x = getRandomFloat(0.3, 0.1);
-				matInfo.y = getRandomFloat(0.3, 0.1);
-				matInfo.w = 0.0;
-				matInfo.z = 0.0;
 				
 			}
 			//

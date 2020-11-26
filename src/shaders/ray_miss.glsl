@@ -13,4 +13,8 @@ void main() {
 
 	PrimaryRay.color = vec3(Params.clearColor);
 	PrimaryRay.isMiss = true;
+	if (PrimaryRay.isIndirect && PrimaryRay.rayDepth > 0) //first iteration 
+	{
+		PrimaryRay.color = vec3(0.0);  // No contribution from environment
+	}
 }

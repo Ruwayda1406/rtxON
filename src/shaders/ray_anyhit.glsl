@@ -86,7 +86,8 @@ ShadingData getHitShadingData(uint objId)
 	// Computing the normal at hit position
 	hit.normal = normalize(BaryLerp(v0.normal.xyz, v1.normal.xyz, v2.normal.xyz, barycentrics));
 	//const vec2 uv = BaryLerp(v0.uv.xy, v1.uv.xy, v2.uv.xy, barycentrics);
-	hit.difColor = meshInfoArray[objId].info[0].xyzw;
+
+	hit.matColor = meshInfoArray[objId].info[0].xyzw;
 	hit.kd = meshInfoArray[objId].info[1].x;
 	hit.ks = meshInfoArray[objId].info[1].y;
 	hit.mat = int(meshInfoArray[objId].info[1].z);
@@ -97,7 +98,7 @@ ShadingData getHitShadingData(uint objId)
 }
 void main() {
 	// Is this a transparent part of the surface?  If so, ignore this hit
-	if (PrimaryRay.accColor.w < 1.0)
+	/*if (PrimaryRay.accColor.w < 1.0)
 	{
 		const uint objId = gl_InstanceCustomIndexEXT;
 		ShadingData hit = getHitShadingData(objId);
@@ -109,5 +110,5 @@ void main() {
 		{
 			ignoreIntersectionEXT();
 		}
-	}
+	}*/
 }
