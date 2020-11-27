@@ -129,7 +129,7 @@ vec3 computeIndirectLigthing(uint rndSeed)
 		indirectRay.rayDepth = 0;
 
 		vec3 curWeight = vec3(1);
-		for (; indirectRay.rayDepth < MaxRayDepth; indirectRay.rayDepth++)
+		for (; indirectRay.rayDepth< MaxRayDepth; indirectRay.rayDepth++)
 		{
 			traceRayEXT(Scene,
 				rayFlags,
@@ -143,12 +143,13 @@ vec3 computeIndirectLigthing(uint rndSeed)
 				tmax,
 				SWS_LOC_INDIRECT_RAY);
 
-			hitValues += indirectRay.hitValue * curWeight;
+			hitValues += indirectRay.hitValue*curWeight;
 			curWeight *= indirectRay.weight;
 
 			rayOrigin = indirectRay.rayOrigin;
 			rayDirection = indirectRay.rayDir;
 		}
+
 	}
 	
 	return (hitValues / float(MAX_PATHS));
@@ -161,12 +162,18 @@ void main() {
 	vec3 directLighting = computeDirectLighting(rndSeed);
 	vec3 color = directLighting;
 
-	if (mode == 2)
+
+	vec3 indirectLigthing = vec3(0);
+	if (mode == 2|| mode==3)
 	{
 		vec3 matColor = PrimaryRay.matColor;
 		//path tracer
 		vec3 indirectLigthing = computeIndirectLigthing(rndSeed);
-		color = (directLighting + indirectLigthing);// *matColor / M_PI;
+		color =(directLighting + indirectLigthing)*matColor / M_PI;
+		if (mode == 3)
+		{
+			color = indirectLigthing;
+		}
 	}
 	imageStore(ResultImage, ivec2(gl_LaunchIDEXT.xy), vec4(color, 1.f));
 }

@@ -28,7 +28,6 @@ layout(set = SWS_UNIFORMPARAMS_SET, binding = SWS_UNIFORMPARAMS_BINDING, std140)
 };
 
 layout(location = SWS_LOC_INDIRECT_RAY) rayPayloadInEXT IndirectRayPayload indirectRay;
-layout(location = SWS_LOC_INDIRECT_RAY_2) rayPayloadInEXT IndirectRayPayload indirectRay2;
 
 hitAttributeEXT vec2 HitAttribs;
 ShadingData getHitShadingData(uint objId)
@@ -77,9 +76,9 @@ vec3 shootRay(vec3 rayOrigin, vec3 rayDirection, float min, float max, uint rndS
 		tmin,
 		rayDirection,
 		tmax,
-		SWS_LOC_INDIRECT_RAY_2);
+		SWS_LOC_INDIRECT_RAY);
 
-	return indirectRay2.hitValue;
+	return indirectRay.hitValue;
 
 }
 
@@ -91,11 +90,10 @@ void main() {
 	{
 		const uint objId = gl_InstanceCustomIndexEXT;
 		ShadingData hit = getHitShadingData(objId);
-
-		//vec3 directLightContrib = DiffuseShade(hit.pos, hit.normal, hit.matColor.xyz, hit.kd, hit.ks);
 		//https://en.wikipedia.org/wiki/Path_tracing
-		//https://www.scratchapixel.com/lessons/3d-basic-rendering/global-illumination-path-tracing/global-illumination-path-tracing-practical-implementation
-		// Pick a random direction from here and keep going.
+	    //https://www.scratchapixel.com/lessons/3d-basic-rendering/global-illumination-path-tracing/global-illumination-path-tracing-practical-implementation
+		//vec3 directLightContrib = DiffuseShade(hit.pos, hit.normal, hit.matColor.xyz, hit.kd, hit.ks);
+	    // Pick a random direction from here and keep going.
 		vec3 tangent, bitangent;
 		createCoordinateSystem(hit.normal, tangent, bitangent);
 		//the newRay
@@ -114,15 +112,15 @@ void main() {
 		indirectRay.rayDir = rayDirection;
 		vec3 incoming = hit.emittance;
 		indirectRay.weight = BRDF * cos_theta / pdf;
-
 		// Recursively trace reflected light sources.
 		if (indirectRay.rayDepth + 1.0 < MaxRayDepth)
 		{
+			
 			indirectRay.rayDepth++;
 			incoming = shootRay(indirectRay.rayOrigin, indirectRay.rayDir, 0.0001, 10000.0, indirectRay.rndSeed);
 		}
 		// Apply the Rendering Equation here.
 		indirectRay.hitValue = hit.emittance + (BRDF * incoming * cos_theta / pdf);
-		//PrimaryRay.color = incoming * cos_theta;
+		
 	}
 }

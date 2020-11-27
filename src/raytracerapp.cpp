@@ -183,6 +183,7 @@ void RayTracerApp::OnKey(const int key, const int scancode, const int action, co
 		switch (key) {
 		case GLFW_KEY_1: mode = 1; break;
 		case GLFW_KEY_2: mode = 2; break;
+		case GLFW_KEY_3: mode = 3; break;
 		case GLFW_KEY_0: lightType = 0; break;
 		case GLFW_KEY_9: lightType = 9; break;
 		case GLFW_KEY_W: mWKeyDown = false; break;
@@ -460,7 +461,7 @@ void RayTracerApp::LoadSceneGeometry(String fileName) {
 				matInfo.x = 0.5;
 				matInfo.y = 0.5;
 				matInfo.z = 3.0;//reflect
-				matInfo.w = 0.0;
+				matInfo.w = 1.0;
 			}
 			else
 			{
@@ -476,7 +477,7 @@ void RayTracerApp::LoadSceneGeometry(String fileName) {
 					colorInfo.y = 1;
 					colorInfo.z = 1;
 					colorInfo.w = 1;// alpha 
-					matInfo.w = 0.0;
+					matInfo.w = 1.0;
 				}
 				else
 				{
