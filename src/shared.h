@@ -5,16 +5,17 @@
 // include vec & mat types (same namings as in GLSL)
 #include "framework/common.h"
 #endif // __cplusplus
-#define MaxRayDepth 20
-#define MAX_PATHS 30
-#define max_antialiasing_iter  10
+#define MaxRayDepth			 	5
+#define MAX_PATHS				10
+#define max_antialiasing_iter   10
 //
-#define SWS_PRIMARY_HIT_SHADERS_IDX     0
-#define SWS_PRIMARY_MISS_SHADERS_IDX    0
-#define SWS_SHADOW_HIT_SHADERS_IDX      1
-#define SWS_SHADOW_MISS_SHADERS_IDX     1
-#define SWS_INDIRECT_HIT_SHADERS_IDX    2
-#define SWS_INDIRECT_MISS_SHADERS_IDX    2
+#define SWS_PRIMARY_HIT_SHADERS_IDX      0
+#define SWS_PRIMARY_MISS_SHADERS_IDX     0
+#define SWS_INDIRECT_HIT_SHADERS_IDX     1
+#define SWS_INDIRECT_MISS_SHADERS_IDX    1
+
+//#define SWS_SHADOW_HIT_SHADERS_IDX       2
+#define SWS_SHADOW_MISS_SHADERS_IDX      2
 ///////////////////////////////////////////
 // resource locations
 #define SWS_SCENE_AS_SET                0
@@ -41,29 +42,31 @@
 #define SWS_LOC_HIT_ATTRIBS             1
 #define SWS_LOC_SHADOW_RAY              2
 #define SWS_LOC_INDIRECT_RAY            3
-
+#define SWS_LOC_INDIRECT_RAY_2          4
 #define SWS_MAX_RECURSION               10
 //////////////////////////////////////////
 struct RayPayload {
 	vec4 accColor;// used in anyhit
-    vec3 color;
-    vec3 normal;
-	vec3 pos;
-	float dist;
-	float attenuation;
-	bool done;
+    vec3 hitValue;
 	bool isMiss;
+	vec3 matColor;
+	// for recursion
 	vec3 rayOrigin;
 	vec3 rayDir;
-	uint rndSeed; // current random seed
-	int rayDepth;
-	bool isIndirect;
-	vec3 difColor;
-	vec3 weight;
+	float attenuation;
+	bool done;
 };
 struct IndirectRayPayload {
-	vec3 color;
+	vec3 hitNormal;
+	vec3 hitPos;
+	vec3 hitColor;
+	vec3 hitValue;
+	bool isMiss;
 	uint rndSeed; // current random seed
+	int rayDepth;
+	vec3 weight;
+	vec3 rayOrigin;
+	vec3 rayDir;
 };
 struct ShadowRayPayload {
 	bool isShadowed;

@@ -11,10 +11,6 @@ layout(set = SWS_UNIFORMPARAMS_SET, binding = SWS_UNIFORMPARAMS_BINDING, std140)
 
 void main() {
 
-	PrimaryRay.color = vec3(Params.clearColor);
+	PrimaryRay.hitValue = vec3(Params.clearColor);
 	PrimaryRay.isMiss = true;
-	if (PrimaryRay.isIndirect && PrimaryRay.rayDepth > 0) //first iteration 
-	{
-		PrimaryRay.color = vec3(0.0);  // No contribution from environment
-	}
 }

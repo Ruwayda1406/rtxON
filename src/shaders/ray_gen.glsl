@@ -17,6 +17,7 @@ layout(set = SWS_UNIFORMPARAMS_SET, binding = SWS_UNIFORMPARAMS_BINDING, std140)
 };
 
 layout(location = SWS_LOC_PRIMARY_RAY) rayPayloadEXT RayPayload PrimaryRay;
+layout(location = SWS_LOC_INDIRECT_RAY) rayPayloadEXT IndirectRayPayload indirectRay;
 vec3 CalcRayDir(vec2 pixel, float aspect) {
 
 	vec3 w = Camera.dir.xyz;
@@ -31,7 +32,7 @@ vec3 CalcRayDir(vec2 pixel, float aspect) {
 	const vec3 rayDir = normalize(w + (u * pixel.x) - (v * pixel.y));
 	return rayDir;
 }
-vec3 shootColorRay(vec3 rayOrigin, vec3 rayDirection, float min, float max, uint rndSeed)
+vec3 shootColorRay(vec3 rayOrigin, vec3 rayDirection, float min, float max)
 {
 	const uint rayFlags = gl_RayFlagsOpaqueEXT;// gl_RayFlagsNoneEXT; ;// gl_RayFlagsOpaqueEXT;
 
@@ -43,10 +44,9 @@ vec3 shootColorRay(vec3 rayOrigin, vec3 rayDirection, float min, float max, uint
 	PrimaryRay.done = true;
 	PrimaryRay.rayOrigin = rayOrigin.xyz;
 	PrimaryRay.rayDir = rayDirection.xyz;
-	PrimaryRay.color = vec3(0);
+	PrimaryRay.hitValue = vec3(0);
 	PrimaryRay.attenuation = 1.f;
 	PrimaryRay.accColor = vec4(0);
-	PrimaryRay.rndSeed = rndSeed;
 
 	vec3 hitValue = vec3(0);
 	for (int i = 0; i < SWS_MAX_RECURSION; i++)//for reflective material 
@@ -63,7 +63,7 @@ vec3 shootColorRay(vec3 rayOrigin, vec3 rayDirection, float min, float max, uint
 			tmax,
 			SWS_LOC_PRIMARY_RAY);
 
-		hitValue += PrimaryRay.color * PrimaryRay.attenuation;
+		hitValue += PrimaryRay.hitValue * PrimaryRay.attenuation;
 
 		if (PrimaryRay.done)
 			break;
@@ -76,16 +76,9 @@ vec3 shootColorRay(vec3 rayOrigin, vec3 rayDirection, float min, float max, uint
 	return hitValue;
 
 }
-void main() {
-	int mode = int(Params.modeFrame.x);
-	float deltaTime = Params.modeFrame.y;
-
-	////////////////////  directLighting ///////////////////////////////////////
-	// First:: Do diffuse shading at the primary hit
-	uint rndSeed = tea(gl_LaunchIDEXT.y * gl_LaunchSizeEXT.x + gl_LaunchIDEXT.x, int(deltaTime));
-	
-	vec3 color;
-	PrimaryRay.isIndirect = false;
+vec3 computeDirectLighting(uint rndSeed)
+{
+	// Do diffuse shading at the primary hit
 	// monte carlo antialiasing
 	vec3 hitValues = vec3(0);
 	for (int smpl = 0; smpl < max_antialiasing_iter; smpl++)
@@ -102,45 +95,78 @@ void main() {
 		// Initialize a ray structure for our ray tracer
 		vec3 origin = Camera.pos.xyz;
 		vec3 direction = CalcRayDir(pixel, aspect);
-		vec3  hitValue = shootColorRay(origin, direction, 0.0001, 10000.0, rndSeed);
+		vec3  hitValue = shootColorRay(origin, direction, 0.0001, 10000.0);
 		hitValues += hitValue;
 
 	}
-	vec3 directLighting = hitValues / max_antialiasing_iter;
-	color = directLighting;
-		
-	
-	if(mode==2)  /////////////////////// indirectLigthing ///////////////////////////////////////
+	return ( hitValues / float(max_antialiasing_iter));
+}
+vec3 computeIndirectLigthing(uint rndSeed)
+{
+	const vec2 uv = vec2(gl_LaunchIDEXT.xy);
+	const vec2 pixel = uv / (gl_LaunchSizeEXT.xy - 1.0);
+	const float aspect = float(gl_LaunchSizeEXT.x) / float(gl_LaunchSizeEXT.y);
+	// Initialize a ray structure for our ray tracer
+	vec3 origin = Camera.pos.xyz;
+	vec3 direction = CalcRayDir(pixel, aspect);
+	////////////////// path tracing ////////////////////////
+	const uint rayFlags = gl_RayFlagsOpaqueEXT;// gl_RayFlagsNoneEXT; ;// gl_RayFlagsOpaqueEXT;
+
+	const uint cullMask = 0xFF;
+	const uint stbRecordStride = 1;
+	const float tmin = 0.001;
+	const float tmax = 1000.0;// Camera.nearFarFov.y;
+
+	vec3 hitValues = vec3(0);
+	for (int p = 0; p < MAX_PATHS; p++)
 	{
-		PrimaryRay.rndSeed = rndSeed;
-		PrimaryRay.isIndirect = true;
-		const vec2 uv = vec2(gl_LaunchIDEXT.xy);
-		const vec2 pixel = uv / (gl_LaunchSizeEXT.xy - 1.0);
-		const float aspect = float(gl_LaunchSizeEXT.x) / float(gl_LaunchSizeEXT.y);
 
+		vec3 rayOrigin = origin.xyz;
+		vec3 rayDirection = direction.xyz;
 
-		// Initialize a ray structure for our ray tracer
-		vec3 origin = Camera.pos.xyz;
-		vec3 direction = CalcRayDir(pixel, aspect);
-		vec3 pathsColor = vec3(0);
-		int hits = 0;
-		////////////////// path tracing ////////////////////////
-		for (int p = 0; p < MAX_PATHS; p++)
+		indirectRay.rndSeed = rndSeed;
+		indirectRay.weight = vec3(0);
+		indirectRay.rayDepth = 0;
+
+		vec3 curWeight = vec3(1);
+		for (; indirectRay.rayDepth < MaxRayDepth; indirectRay.rayDepth++)
 		{
-			PrimaryRay.weight = vec3(0);
-			PrimaryRay.rayDepth = 0;
-			PrimaryRay.rayOrigin = origin.xyz;
-			PrimaryRay.rayDir = direction.xyz;
-			vec3 curWeight = vec3(1);
-			for (; PrimaryRay.rayDepth < MaxRayDepth; PrimaryRay.rayDepth++)
-			{
-				vec3 value = shootColorRay(PrimaryRay.rayOrigin, PrimaryRay.rayDir, 0.0001, 10000.0, rndSeed);
-				pathsColor += value * curWeight;
-				curWeight *= PrimaryRay.weight;
-			}
+			traceRayEXT(Scene,
+				rayFlags,
+				cullMask,
+				SWS_INDIRECT_HIT_SHADERS_IDX,
+				stbRecordStride,
+				SWS_INDIRECT_MISS_SHADERS_IDX,
+				rayOrigin,
+				tmin,
+				rayDirection,
+				tmax,
+				SWS_LOC_INDIRECT_RAY);
+
+			hitValues += indirectRay.hitValue * curWeight;
+			curWeight *= indirectRay.weight;
+
+			rayOrigin = indirectRay.rayOrigin;
+			rayDirection = indirectRay.rayDir;
 		}
-		/////////////////////////////////////////////////////////////////////
-		color *= pathsColor / float(MAX_PATHS);
+	}
+	
+	return (hitValues / float(MAX_PATHS));
+}
+void main() {
+	int mode = int(Params.modeFrame.x);
+	float deltaTime = Params.modeFrame.y;
+	uint rndSeed = tea(gl_LaunchIDEXT.y * gl_LaunchSizeEXT.x + gl_LaunchIDEXT.x, int(deltaTime));
+
+	vec3 directLighting = computeDirectLighting(rndSeed);
+	vec3 color = directLighting;
+
+	if (mode == 2)
+	{
+		vec3 matColor = PrimaryRay.matColor;
+		//path tracer
+		vec3 indirectLigthing = computeIndirectLigthing(rndSeed);
+		color = (directLighting + indirectLigthing);// *matColor / M_PI;
 	}
 	imageStore(ResultImage, ivec2(gl_LaunchIDEXT.xy), vec4(color, 1.f));
 }

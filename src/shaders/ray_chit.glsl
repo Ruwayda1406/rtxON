@@ -38,7 +38,7 @@ vec3 computeDiffuse(vec3 lightDir, vec3 normal, vec3 kd, vec3 ambient)
 	// Lambertian
 	float NdotL = max(dot(normal, lightDir), 0.0);
 	//float NdotL = clamp(dot(normal, lightDir), 0.0, 1.0); // In range [0..1]
-	return (ambient+(kd * NdotL));
+	return (ambient + (kd * NdotL));
 }
 
 vec3 computeSpecular(vec3 viewDir, vec3 lightDir, vec3 normal, vec3 ks, float shininess)
@@ -65,14 +65,13 @@ ShadingData getHitShadingData(uint objId)
 	// Computing the normal at hit position
 	closestHit.normal = normalize(BaryLerp(v0.normal.xyz, v1.normal.xyz, v2.normal.xyz, barycentrics));
 	//const vec2 uv = BaryLerp(v0.uv.xy, v1.uv.xy, v2.uv.xy, barycentrics);
-	//closestHit.difColor = PrimaryRay.accColor.xyzw;
 	closestHit.matColor = meshInfoArray[objId].info[0];
-	closestHit.emittance = vec3(0.5);;//just for now
-	closestHit.reflectance = closestHit.matColor.xyz;//just for now
 
 	closestHit.kd = meshInfoArray[objId].info[1].x;
 	closestHit.ks = meshInfoArray[objId].info[1].y;
 	closestHit.mat = int(meshInfoArray[objId].info[1].z);
+	closestHit.emittance = vec3(meshInfoArray[objId].info[1].w);
+
 	closestHit.pos = gl_WorldRayOriginEXT + gl_WorldRayDirectionEXT * gl_HitTEXT;
 
 	return closestHit;
@@ -99,7 +98,7 @@ bool shootShadowRay(vec3 shadowRayOrigin, vec3 dirToLight, float min, float dist
 	return ShadowRay.isShadowed;
 
 }
-vec3 DiffuseShade(vec3 HitPosition, vec3 HitNormal, vec3 HitMatColor, float kd,float ks)
+vec3 DiffuseShade(vec3 HitPosition, vec3 HitNormal, vec3 HitMatColor, float kd, float ks)
 {
 	// Get information about this light; access your framework’s scene structs
 	int LightCount = int(Params.LightInfo.x);
@@ -158,115 +157,23 @@ vec3 DiffuseShade(vec3 HitPosition, vec3 HitNormal, vec3 HitMatColor, float kd,f
 	vec3 finalcolor = hitValues / float(LightCount);
 	return finalcolor;
 }
-vec3 shootColorRay(vec3 rayOrigin, vec3 rayDirection, float min, float max, uint rndSeed)
-{
-	const uint rayFlags = gl_RayFlagsOpaqueEXT;// gl_RayFlagsNoneEXT; ;// gl_RayFlagsOpaqueEXT;
-
-	const uint cullMask = 0xFF;
-	const uint stbRecordStride = 1;
-	const float tmin = min;
-	const float tmax = max;// Camera.nearFarFov.y;
-
-	PrimaryRay.done = true;
-	PrimaryRay.rayOrigin = rayOrigin.xyz;
-	PrimaryRay.rayDir = rayDirection.xyz;
-	PrimaryRay.color = vec3(0);
-	PrimaryRay.attenuation = 1.f;
-	PrimaryRay.accColor = vec4(0);
-	PrimaryRay.rndSeed = rndSeed;
-
-	vec3 hitValue = vec3(0);
-	for (int i = 0; i < SWS_MAX_RECURSION; i++)//for reflective material 
-	{
-		traceRayEXT(Scene,
-			rayFlags,
-			cullMask,
-			SWS_PRIMARY_HIT_SHADERS_IDX,
-			stbRecordStride,
-			SWS_PRIMARY_MISS_SHADERS_IDX,
-			rayOrigin,
-			tmin,
-			rayDirection,
-			tmax,
-			SWS_LOC_PRIMARY_RAY);
-
-		hitValue += PrimaryRay.color * PrimaryRay.attenuation;
-
-		if (PrimaryRay.done)
-			break;
-
-		rayOrigin = PrimaryRay.rayOrigin;
-		rayDirection = PrimaryRay.rayDir;
-		PrimaryRay.done = true;  // Will stop if a reflective material isn't hit
-		PrimaryRay.accColor = vec4(0);
-	}
-	return hitValue;
-
-}
-
 void main() {
 	PrimaryRay.isMiss = false;
-	// Object of this instance
 	const uint objId = gl_InstanceCustomIndexEXT;
 	ShadingData hit = getHitShadingData(objId);
-	
-	PrimaryRay.color = DiffuseShade(hit.pos, hit.normal, hit.matColor.xyz, hit.kd, hit.ks);
-	PrimaryRay.normal = hit.normal;
-	PrimaryRay.pos = hit.pos;
 
-	if (!PrimaryRay.isIndirect)
+	PrimaryRay.hitValue = DiffuseShade(hit.pos, hit.normal, hit.matColor.xyz, hit.kd, hit.ks);
+	PrimaryRay.matColor = hit.matColor.xyz;
+	if (hit.mat == 3)// Reflection
 	{
-		if (hit.mat == 3)// Reflection
-		{
-			vec3 origin = hit.pos;
-			vec3 rayDir = reflect(gl_WorldRayDirectionEXT, hit.normal);
-			PrimaryRay.attenuation *= hit.ks;
-			PrimaryRay.done = false;
-			PrimaryRay.rayOrigin = origin;
-			PrimaryRay.rayDir = rayDir;
-		}
+		vec3 origin = hit.pos;
+		vec3 rayDir = reflect(gl_WorldRayDirectionEXT, hit.normal);
+		PrimaryRay.attenuation *= hit.ks;
+		PrimaryRay.done = false;
+		PrimaryRay.rayOrigin = origin;
+		PrimaryRay.rayDir = rayDir;
 	}
-	else
-	{
-		if(PrimaryRay.rayDepth > MaxRayDepth)
-			PrimaryRay.color= vec3(0);
-		else
-		{
-			//https://en.wikipedia.org/wiki/Path_tracing
-			// Pick a random direction from here and keep going.
-			vec3 tangent, bitangent;
-			createCoordinateSystem(hit.normal, tangent, bitangent);
 
-			//the newRay
-			vec3 rayOrigin = hit.pos;
-			vec3 rayDirection = samplingHemisphere(PrimaryRay.rndSeed, tangent, bitangent, hit.normal);
-
-			// Probability of the newRay
-			//const float p = 1.0 / (2.0 * M_PI);
-			const float p = 1.0 / M_PI;
-
-			// Compute the BRDF for this ray (assuming Lambertian reflection)
-			float cos_theta = dot(rayDirection, hit.normal);
-			vec3 BRDF = hit.reflectance / M_PI;
-
-			
-			PrimaryRay.rayOrigin = rayOrigin;
-			PrimaryRay.rayDir = rayDirection;
-			vec3 incoming = hit.emittance;
-			PrimaryRay.weight = BRDF * cos_theta / p;
-
-			// Recursively trace reflected light sources.
-			if (PrimaryRay.rayDepth + 1.0 < MaxRayDepth)
-			{
-				PrimaryRay.rayDepth++;
-				incoming = shootColorRay(PrimaryRay.rayOrigin, PrimaryRay.rayDir, 0.0001, 10000.0, PrimaryRay.rndSeed);
-			}
-			// Apply the Rendering Equation here.
-			PrimaryRay.color = hit.emittance + (BRDF * incoming * cos_theta / p);
-		}
-		    
-
-	}
 }
 
 

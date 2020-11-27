@@ -1,3 +1,4 @@
+
 #version 460
 #extension GL_EXT_ray_tracing : enable
 #extension GL_GOOGLE_include_directive : require
@@ -5,7 +6,16 @@
 #include "../shared.h"
 
 layout(location = SWS_LOC_INDIRECT_RAY) rayPayloadInEXT IndirectRayPayload indirectRay;
-void main() {
+layout(set = SWS_UNIFORMPARAMS_SET, binding = SWS_UNIFORMPARAMS_BINDING, std140)     uniform AppData{
+	UniformParams Params;
+};
 
-	indirectRay.color = vec3(0);
+void main() {
+	indirectRay.hitValue = vec3(Params.clearColor);
+	indirectRay.isMiss = true;
+	if (indirectRay.rayDepth > 0) //first iteration 
+	{
+		indirectRay.hitValue = vec3(0.0);  // No contribution from environment
+		indirectRay.rayDepth = MaxRayDepth;
+	}
 }
