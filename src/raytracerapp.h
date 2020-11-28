@@ -81,7 +81,7 @@ public:
 	float LightIntensity;
 	int size;
 	int width;
-	Light() :lightPos(vec3(0.4f, 0.45f, 0.55f)),ShadowAttenuation(0.3), LightIntensity(0.5f),width(5)
+	Light() :lightPos(vec3(0.0f, 0.40f, 1.0f)),ShadowAttenuation(0.3), LightIntensity(0.1f),width(5)
 	{
 		size = width * width;
 		LightSource = Array<vec4>(size);

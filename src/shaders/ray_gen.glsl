@@ -81,7 +81,7 @@ vec3 computeDirectLighting(uint rndSeed)
 	// Do diffuse shading at the primary hit
 	// monte carlo antialiasing
 	vec3 hitValues = vec3(0);
-	for (int smpl = 0; smpl < max_antialiasing_iter; smpl++)
+	for (int smpl = 0; smpl < MAX_ANTIALIASING_ITER; smpl++)
 	{
 		float r1 = nextRand(rndSeed);
 		float r2 = nextRand(rndSeed);
@@ -99,7 +99,7 @@ vec3 computeDirectLighting(uint rndSeed)
 		hitValues += hitValue;
 
 	}
-	return ( hitValues / float(max_antialiasing_iter));
+	return ( hitValues / float(MAX_ANTIALIASING_ITER));
 }
 vec3 computeIndirectLigthing(uint rndSeed)
 {
@@ -118,18 +118,18 @@ vec3 computeIndirectLigthing(uint rndSeed)
 	const float tmax = 1000.0;// Camera.nearFarFov.y;
 
 	vec3 hitValues = vec3(0);
-	for (int p = 0; p < MAX_PATHS; p++)
+	for (int p = 0; p < MAX_PATH_TRACED; p++)
 	{
 
 		vec3 rayOrigin = origin.xyz;
 		vec3 rayDirection = direction.xyz;
 
 		indirectRay.rndSeed = rndSeed;
-		indirectRay.weight = vec3(0);
+		indirectRay.weight = vec3(1);
 		indirectRay.rayDepth = 0;
 
-		vec3 curWeight = vec3(1);
-		for (; indirectRay.rayDepth< MaxRayDepth; indirectRay.rayDepth++)
+		//vec3 curWeight = vec3(1);
+		for (; indirectRay.rayDepth< MAX_PATH_DEPTH; indirectRay.rayDepth++)
 		{
 			traceRayEXT(Scene,
 				rayFlags,
@@ -143,8 +143,8 @@ vec3 computeIndirectLigthing(uint rndSeed)
 				tmax,
 				SWS_LOC_INDIRECT_RAY);
 
-			hitValues += indirectRay.hitValue*curWeight;
-			curWeight *= indirectRay.weight;
+			hitValues += indirectRay.hitValue;// *curWeight;
+			//curWeight *= indirectRay.weight;
 
 			rayOrigin = indirectRay.rayOrigin;
 			rayDirection = indirectRay.rayDir;
@@ -152,7 +152,7 @@ vec3 computeIndirectLigthing(uint rndSeed)
 
 	}
 	
-	return (hitValues / float(MAX_PATHS));
+	return (hitValues / float(MAX_PATH_TRACED));
 }
 void main() {
 	int mode = int(Params.modeFrame.x);
@@ -169,7 +169,7 @@ void main() {
 		vec3 matColor = PrimaryRay.matColor;
 		//path tracer
 		vec3 indirectLigthing = computeIndirectLigthing(rndSeed);
-		color =(directLighting + indirectLigthing)*matColor / M_PI;
+		color = (directLighting + indirectLigthing)*matColor;
 		if (mode == 3)
 		{
 			color = indirectLigthing;

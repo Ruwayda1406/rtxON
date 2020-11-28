@@ -16,6 +16,6 @@ void main() {
 	if (indirectRay.rayDepth > 0) //first iteration 
 	{
 		indirectRay.hitValue = vec3(0.0);  // No contribution from environment
-		indirectRay.rayDepth = MaxRayDepth;
+		indirectRay.rayDepth = MAX_PATH_DEPTH;
 	}
 }

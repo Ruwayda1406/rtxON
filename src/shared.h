@@ -5,9 +5,9 @@
 // include vec & mat types (same namings as in GLSL)
 #include "framework/common.h"
 #endif // __cplusplus
-#define MaxRayDepth			 	30
-#define MAX_PATHS				20
-#define max_antialiasing_iter   10
+#define MAX_PATH_DEPTH			 	30
+#define MAX_PATH_TRACED			50
+#define MAX_ANTIALIASING_ITER   10
 //
 #define SWS_PRIMARY_HIT_SHADERS_IDX      0
 #define SWS_PRIMARY_MISS_SHADERS_IDX     0

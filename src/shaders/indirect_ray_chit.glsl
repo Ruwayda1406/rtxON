@@ -84,7 +84,7 @@ vec3 shootRay(vec3 rayOrigin, vec3 rayDirection, float min, float max, uint rndS
 
 void main() {
 	indirectRay.isMiss = false;
-	if (indirectRay.rayDepth > MaxRayDepth)
+	if (indirectRay.rayDepth > MAX_PATH_DEPTH)
 		indirectRay.hitValue = vec3(0);
 	else
 	{
@@ -102,6 +102,7 @@ void main() {
 
 		// Probability of the newRay
 		const float pdf = 1.0 / (2.0 * M_PI);
+
 		vec3 albedo = hit.matColor.xyz;
 		// Compute the BRDF for this ray (assuming Lambertian reflection)
 		float cos_theta = dot(rayDirection, hit.normal);
@@ -111,16 +112,16 @@ void main() {
 		indirectRay.rayOrigin = rayOrigin;
 		indirectRay.rayDir = rayDirection;
 		vec3 incoming = hit.emittance;
-		indirectRay.weight = BRDF * cos_theta / pdf;
+		vec3 weight = indirectRay.weight;
 		// Recursively trace reflected light sources.
-		if (indirectRay.rayDepth + 1.0 < MaxRayDepth)
+		if (indirectRay.rayDepth + 1.0 < MAX_PATH_DEPTH)
 		{
-			
+			indirectRay.weight *= (BRDF * cos_theta / pdf);
 			indirectRay.rayDepth++;
 			incoming = shootRay(indirectRay.rayOrigin, indirectRay.rayDir, 0.0001, 10000.0, indirectRay.rndSeed);
 		}
 		// Apply the Rendering Equation here.
-		indirectRay.hitValue = hit.emittance + (BRDF * incoming * cos_theta / pdf);
+		indirectRay.hitValue = hit.emittance + (incoming * weight);
 		
 	}
 }

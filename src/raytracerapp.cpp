@@ -461,7 +461,7 @@ void RayTracerApp::LoadSceneGeometry(String fileName) {
 				matInfo.x = 0.5;
 				matInfo.y = 0.5;
 				matInfo.z = 3.0;//reflect
-				matInfo.w = 1.0;
+				matInfo.w = 0.0;
 			}
 			else
 			{
