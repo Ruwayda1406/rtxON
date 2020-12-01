@@ -92,11 +92,8 @@ void RayTracerApp::updateUniformParams(const float deltaTime,int frameNumber) {
 	// copy others data to gpu
 	UniformParams* params = reinterpret_cast<UniformParams*>(mUniformParamsBuffer.Map());
 	params->clearColor = backgroundColor;
-	for (int i = 0; i < mLight.size; i++)
-	{
-		params->LightSource[i] = mLight.LightSource[i];
-	}
-	params->LightInfo = vec4(mLight.size, mLight.ShadowAttenuation, lightType,0);
+	params->LightPos = mLight.getLightPos();
+	params->LightInfo = vec4(lightType, mLight.ShadowAttenuation, 0,0);
 	params->modeFrame= vec4(mode, frameNumber,0.0,0.0);
 	mUniformParamsBuffer.Unmap();
 }

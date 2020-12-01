@@ -84,7 +84,7 @@ vec3 computeDirectLighting()
 		float r2 = nextRand(rndSeed);
 		// Subpixel jitter: send the ray through a different position inside the pixel
 		// each time, to provide antialiasing.
-		const vec2 uv = vec2(gl_LaunchIDEXT.xy) + vec2(r1, r2);
+		const vec2 uv = vec2(gl_LaunchIDEXT.xy) +vec2(r1, r2);
 		const vec2 pixel = uv / (gl_LaunchSizeEXT.xy - 1.0);
 		const float aspect = float(gl_LaunchSizeEXT.x) / float(gl_LaunchSizeEXT.y);
 

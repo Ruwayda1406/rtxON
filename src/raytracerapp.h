@@ -76,36 +76,18 @@ class Light
 
 public:
 	float ShadowAttenuation;
-	vec3 lightPos;//lightPosition
-	Array<vec4> LightSource;
+	vec3 lightPos;
 	float LightIntensity;
-	int size;
-	int width;
-	float step;
-	Light() :lightPos(vec3(0.0f, 0.40f, 1.0f)),ShadowAttenuation(0.1), LightIntensity(0.9f),width(5),step(0.01)
+	Light() :lightPos(vec3(0.0f, 0.40f, 1.0f)),ShadowAttenuation(0.1), LightIntensity(0.9f)
 	{
-
-		size = width * width;
-		LightSource = Array<vec4>(size);
-		createLightSource();
 	}
 	void move(vec3 step)
 	{
 		lightPos = lightPos+step;
-		createLightSource();
 	}
-	void createLightSource()
+	vec4 getLightPos()
 	{
-		int index = 0;
-		int start = (width / 2.0) *-1;
-		int end = (width / 2.0);
-		for (int i = start; i < end; i++)
-		{
-			for (int j = start; j < end; j++)
-			{
-				LightSource[index++] = vec4(lightPos + (vec3(i, 0, j)*step), LightIntensity);
-			}
-		}
+		return vec4(lightPos, LightIntensity);
 	}
 };
 class RayTracerApp : public VulkanApp {

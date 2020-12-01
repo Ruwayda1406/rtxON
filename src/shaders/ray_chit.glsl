@@ -102,24 +102,24 @@ bool shootShadowRay(vec3 shadowRayOrigin, vec3 dirToLight, float min, float dist
 vec3 DiffuseShade(vec3 HitPosition, vec3 HitNormal, vec3 HitMatColor, float kd, float ks)
 {
 	// Get information about this light; access your framework’s scene structs
-	int LightCount = int(Params.LightInfo.x);
-	int LightType = int(Params.LightInfo.z);
-	float prob = 1.0 / LightCount;
+	int LightType = int(Params.LightInfo.x);
 	vec3 hitValues = vec3(0);
 
 
 	for (int j = 0; j < MAX_LIGHTS; j++)//SoftShadows
 	{
 		float r1 = nextRand(PrimaryRay.rndSeed);
-		int i = int(clamp(r1*LightCount,0, LightCount));
-		vec3 lightPos = Params.LightSource[i].xyz;
+		float r2 = nextRand(PrimaryRay.rndSeed);
+		float r3 = nextRand(PrimaryRay.rndSeed);
+
+		vec3 lightPos = Params.LightPos.xyz + vec3(r1, r2,r3);
 		vec3 dirToLight;
 		float distToLight, lightIntensity;
 		if (LightType == 0)// Point light
 		{
 			dirToLight = normalize(lightPos - HitPosition);
 			distToLight = length(lightPos - HitPosition);
-			lightIntensity = Params.LightSource[i].w / (distToLight * distToLight);
+			lightIntensity = Params.LightPos.w / (distToLight * distToLight);
 		}
 		else  // Directional light
 		{
