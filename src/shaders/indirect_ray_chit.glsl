@@ -29,7 +29,7 @@ layout(set = SWS_UNIFORMPARAMS_SET, binding = SWS_UNIFORMPARAMS_BINDING, std140)
 
 layout(location = SWS_LOC_PRIMARY_RAY) rayPayloadEXT RayPayload PrimaryRay;
 layout(location = SWS_LOC_INDIRECT_RAY) rayPayloadInEXT IndirectRayPayload indirectRay;
-layout(location = SWS_LOC_INDIRECT_RAY2) rayPayloadInEXT IndirectRayPayload indirectRay2;
+//layout(location = SWS_LOC_INDIRECT_RAY2) rayPayloadInEXT IndirectRayPayload indirectRay2;
 
 hitAttributeEXT vec2 HitAttribs;
 ShadingData getHitShadingData(uint objId)
@@ -67,7 +67,6 @@ vec3 shootRay(vec3 rayOrigin, vec3 rayDirection, float min, float max)
 	const uint stbRecordStride = 1;
 	const float tmin = min;
 	const float tmax = max;// Camera.nearFarFov.y;
-	indirectRay2.rndSeed = indirectRay.rndSeed;
 	traceRayEXT(Scene,
 		rayFlags,
 		cullMask,
@@ -78,10 +77,9 @@ vec3 shootRay(vec3 rayOrigin, vec3 rayDirection, float min, float max)
 		tmin,
 		rayDirection,
 		tmax,
-		SWS_LOC_INDIRECT_RAY2);
+		SWS_LOC_INDIRECT_RAY);
 
-	indirectRay.rndSeed=indirectRay2.rndSeed;
-	return indirectRay2.hitValue;
+	return indirectRay.hitValue;
 
 }
 

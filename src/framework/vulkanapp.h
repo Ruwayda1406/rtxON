@@ -14,19 +14,6 @@ struct AppSettings {
     bool        supportDescriptorIndexing;
 };
 
-struct FPSMeter {
-    static const size_t kFPSHistorySize = 128;
-
-    float   fpsHistory[kFPSHistorySize] = { 0.0f };
-    size_t  historyPointer = 0;
-    float   fpsAccumulator = 0.0f;
-    float   fps = 0.0f;
-
-    void    Update(const float dt);
-    float   GetFPS() const;
-    float   GetFrameTime() const;
-};
-
 class VulkanApp {
 public:
     VulkanApp();
@@ -95,7 +82,4 @@ protected:
 
     // RTX stuff
     VkPhysicalDeviceRayTracingPropertiesKHR mRTProps;
-
-    // FPS meter
-    FPSMeter                mFPSMeter;
 };

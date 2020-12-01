@@ -10,6 +10,7 @@ static const String sScenesFolder = "_data/scenes/";
 static vec4 backgroundColor = vec4(0.7 , 0.8 , 1.0,1.0);
 static vec4 planeColor = vec4(0.7 , 0.8 , 0.5,1.0);
 static int mode = 1;
+static int startTime;
 static int lightType = 9;
 static const float sMoveSpeed = 2.0f;
 static const float sRotateSpeed = 0.25f;
@@ -29,7 +30,7 @@ RayTracerApp::RayTracerApp()
 	, mDownKeyDown(false)
 	, mUpKeyDown(false)
 {
-	
+	startTime= floor(glfwGetTime()*100);
 
 }
 RayTracerApp::~RayTracerApp() {
@@ -52,7 +53,7 @@ void RayTracerApp::InitApp() {
     this->CreateRaytracingPipelineAndSBT();
     this->UpdateDescriptorSets();
 }
-void RayTracerApp::updateUniformParams(const float deltaTime) {
+void RayTracerApp::updateUniformParams(const float deltaTime,int frameNumber) {
 	// update values
 	if (mWKeyDown) {
 		mLight.move(vec3(0.01, 0, 0));
@@ -96,7 +97,7 @@ void RayTracerApp::updateUniformParams(const float deltaTime) {
 		params->LightSource[i] = mLight.LightSource[i];
 	}
 	params->LightInfo = vec4(mLight.size, mLight.ShadowAttenuation, lightType,0);
-	params->modeFrame= vec4(mode,floor(deltaTime*10.0),0.0,0.0);
+	params->modeFrame= vec4(mode, frameNumber,0.0,0.0);
 	mUniformParamsBuffer.Unmap();
 }
 void RayTracerApp::FreeResources() {
@@ -234,11 +235,10 @@ void RayTracerApp::OnMouseButton(const int button, const int action, const int m
 
 void RayTracerApp::Update(const size_t, const float deltaTime) {
     // Update FPS text
-    String frameStats = ToString(mFPSMeter.GetFPS(), 1) + " FPS (" + ToString(mFPSMeter.GetFrameTime(), 1) + " ms)";
-    String fullTitle = mSettings.name + "  " + frameStats;
-    glfwSetWindowTitle(mWindow, fullTitle.c_str());
+	int currTime = floor(glfwGetTime()*100);
+	int frameNumber = currTime-startTime;
     /////////////////
-	this->updateUniformParams(deltaTime);
+	this->updateUniformParams(deltaTime, frameNumber);
 }
 
 

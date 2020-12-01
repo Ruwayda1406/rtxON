@@ -57,12 +57,14 @@ ShadingData getHitShadingData(uint objId)
 }
 void main() {
 	const uint objId = gl_InstanceCustomIndexEXT;
+	uint seed = PrimaryRay.rndSeed;  // We don't want to modify the rndSeed
+
 	ShadingData hit = getHitShadingData(objId);
 	if (hit.matColor.w == 1.0)
 		return;
 	else if (hit.matColor.w == 0.0)
 		ignoreIntersectionEXT();
-	else if (nextRand(PrimaryRay.rndSeed) > hit.matColor.w)
+	else if (nextRand(seed) > hit.matColor.w)
 		ignoreIntersectionEXT();
 
 	/*

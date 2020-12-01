@@ -121,14 +121,14 @@ vec3 computeIndirectLigthing()
 
 		vec3 rayOrigin = origin.xyz;
 		vec3 rayDirection = direction.xyz;
-
+		indirectRay.rndSeed = rndSeed;
 		indirectRay.weight = vec3(1);
 		indirectRay.rayDepth = 0;
 
 		//vec3 curWeight = vec3(1);
 		for (; indirectRay.rayDepth< MAX_PATH_DEPTH; indirectRay.rayDepth++)
 		{
-			indirectRay.rndSeed = rndSeed;
+			
 			traceRayEXT(Scene,
 				rayFlags,
 				cullMask,
@@ -143,11 +143,9 @@ vec3 computeIndirectLigthing()
 
 			hitValues += indirectRay.hitValue;// *curWeight;
 			//curWeight *= indirectRay.weight;
-
+			//rndSeed = indirectRay.rndSeed;
 			rayOrigin = indirectRay.rayOrigin;
 			rayDirection = indirectRay.rayDir;
-
-			rndSeed = indirectRay.rndSeed;
 		}
 
 	}
@@ -169,7 +167,7 @@ void main() {
 		vec3 matColor = PrimaryRay.matColor;
 		//path tracer
 		vec3 indirectLigthing = computeIndirectLigthing();
-		color = (directLighting + indirectLigthing)*matColor;
+		color = (directLighting + indirectLigthing);
 		if (mode == 3)
 		{
 			color = indirectLigthing;
@@ -177,13 +175,13 @@ void main() {
 	}
 
 	// Do accumulation over time
-	if (deltaTime > 0)
+	/*if (deltaTime > 0)
 	{
 		float a = 1.0f / float(deltaTime + 1);
 		vec3  old_color = imageLoad(ResultImage, ivec2(gl_LaunchIDEXT.xy)).xyz;
 		imageStore(ResultImage, ivec2(gl_LaunchIDEXT.xy), vec4(mix(old_color, color, a), 1.f));
 	}
-	else
+	else*/
 	{
 		// First frame, replace the value in the buffer
 		imageStore(ResultImage, ivec2(gl_LaunchIDEXT.xy), vec4(color, 1.f));

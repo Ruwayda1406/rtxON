@@ -116,7 +116,7 @@ public:
 protected:
     virtual void InitSettings() override;
     virtual void InitApp() override;
-	void updateUniformParams(const float dt);
+	void updateUniformParams(const float deltaTime, int frameNumber);
     virtual void FreeResources() override;
     virtual void FillCommandBuffer(VkCommandBuffer commandBuffer, const size_t imageIndex) override;
 	void OnKey(const int key, const int scancode, const int action, const int mods) override;
@@ -158,4 +158,5 @@ private:
 	bool							mWKeyDown,mAKeyDown,mSKeyDown,mDKeyDown;
 	bool							mRightKeyDown, mLeftKeyDown, mDownKeyDown, mUpKeyDown;
 	vulkanhelpers::Buffer mUniformParamsBuffer;
+	int				counter;
 };

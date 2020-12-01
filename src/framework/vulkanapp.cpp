@@ -2,24 +2,6 @@
 
 // include volk.c for implementation
 #include "volk.c"
-
-void FPSMeter::Update(const float dt) {
-    this->fpsAccumulator += dt - this->fpsHistory[this->historyPointer];
-    this->fpsHistory[this->historyPointer] = dt;
-    this->historyPointer = (this->historyPointer + 1) % FPSMeter::kFPSHistorySize;
-    this->fps = (this->fpsAccumulator > 0.0f) ? (1.0f / (this->fpsAccumulator / static_cast<float>(FPSMeter::kFPSHistorySize))) : FLT_MAX;
-}
-
-float FPSMeter::GetFPS() const {
-    return this->fps;
-}
-
-float FPSMeter::GetFrameTime() const {
-    return 1000.0f / this->fps;
-}
-
-
-
 VulkanApp::VulkanApp()
     : mSettings({})
     , mWindow(nullptr)
@@ -187,6 +169,7 @@ bool VulkanApp::InitializeVulkan() {
     if (mSettings.enableValidation) {
         extensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
         layers.push_back("VK_LAYER_KHRONOS_validation");
+		layers.push_back("VK_LAYER_LUNARG_monitor");
     }
 
     VkInstanceCreateInfo instInfo;
@@ -638,7 +621,6 @@ void VulkanApp::FillCommandBuffers() {
 
 //
 void VulkanApp::ProcessFrame(const float dt) {
-    mFPSMeter.Update(dt);
 
     uint32_t imageIndex;
     VkResult error = vkAcquireNextImageKHR(mDevice, mSwapchain, UINT64_MAX, mSemaphoreImageAcquired, VK_NULL_HANDLE, &imageIndex);
