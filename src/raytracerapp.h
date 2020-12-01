@@ -82,7 +82,7 @@ public:
 	int size;
 	int width;
 	float step;
-	Light() :lightPos(vec3(0.0f, 0.40f, 1.0f)),ShadowAttenuation(0.3), LightIntensity(1.0f),width(5),step(0.01)
+	Light() :lightPos(vec3(0.0f, 0.40f, 1.0f)),ShadowAttenuation(0.1), LightIntensity(0.9f),width(5),step(0.01)
 	{
 
 		size = width * width;

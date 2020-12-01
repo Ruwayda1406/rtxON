@@ -108,20 +108,20 @@ vec3 computeIndirectLigthing()
 	vec3 origin = Camera.pos.xyz;
 	vec3 direction = CalcRayDir(pixel, aspect);
 	////////////////// path tracing ////////////////////////
-	const uint rayFlags = gl_RayFlagsOpaqueEXT;// gl_RayFlagsNoneEXT; ;// gl_RayFlagsOpaqueEXT;
+	const uint rayFlags = gl_RayFlagsOpaqueEXT;// gl_RayFlagsNoneEXT; 
 
 	const uint cullMask = 0xFF;
 	const uint stbRecordStride = 1;
 	const float tmin = 0.001;
 	const float tmax = 1000.0;// Camera.nearFarFov.y;
 
+	indirectRay.rndSeed = rndSeed;
 	vec3 hitValues = vec3(0);
 	for (int p = 0; p < MAX_PATH_TRACED; p++)
 	{
 
 		vec3 rayOrigin = origin.xyz;
 		vec3 rayDirection = direction.xyz;
-		indirectRay.rndSeed = rndSeed;
 		indirectRay.weight = vec3(1);
 		indirectRay.rayDepth = 0;
 
@@ -167,7 +167,7 @@ void main() {
 		vec3 matColor = PrimaryRay.matColor;
 		//path tracer
 		vec3 indirectLigthing = computeIndirectLigthing();
-		color = (directLighting + indirectLigthing);
+		color = (directLighting + indirectLigthing)*matColor;
 		if (mode == 3)
 		{
 			color = indirectLigthing;

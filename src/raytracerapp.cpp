@@ -321,8 +321,8 @@ bool RayTracerApp::CreateAS(const VkAccelerationStructureTypeKHR type,
 void RayTracerApp::LoadSceneGeometry() {
 
 	mScene.meshes.clear(); 
-	//LoadObj(sScenesFolder + "test.obj");
-	LoadObj(sScenesFolder + "test2.obj");
+	LoadObj(sScenesFolder + "test.obj");
+	//LoadObj(sScenesFolder + "test2.obj");
 	// prepare shader resources infos
 	const size_t numMeshes = mScene.meshes.size();
 	mScene.meshInfoBufferInfos.resize(numMeshes);

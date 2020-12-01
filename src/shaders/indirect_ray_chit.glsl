@@ -27,7 +27,6 @@ layout(set = SWS_UNIFORMPARAMS_SET, binding = SWS_UNIFORMPARAMS_BINDING, std140)
 	UniformParams Params;
 };
 
-layout(location = SWS_LOC_PRIMARY_RAY) rayPayloadEXT RayPayload PrimaryRay;
 layout(location = SWS_LOC_INDIRECT_RAY) rayPayloadInEXT IndirectRayPayload indirectRay;
 //layout(location = SWS_LOC_INDIRECT_RAY2) rayPayloadInEXT IndirectRayPayload indirectRay2;
 
@@ -61,8 +60,7 @@ ShadingData getHitShadingData(uint objId)
 }
 vec3 shootRay(vec3 rayOrigin, vec3 rayDirection, float min, float max)
 {
-	const uint rayFlags = gl_RayFlagsOpaqueEXT;// gl_RayFlagsNoneEXT; ;// gl_RayFlagsOpaqueEXT;
-
+	const uint rayFlags = gl_RayFlagsOpaqueEXT;
 	const uint cullMask = 0xFF;
 	const uint stbRecordStride = 1;
 	const float tmin = min;
@@ -99,15 +97,15 @@ void main() {
 		createCoordinateSystem(hit.normal, tangent, bitangent);
 		//the newRay
 		vec3 rayOrigin = hit.pos;
-		vec3 rayDirection = samplingHemisphere(PrimaryRay.rndSeed, tangent, bitangent, hit.normal);
+		vec3 rayDirection = samplingHemisphere(indirectRay.rndSeed, tangent, bitangent, hit.normal);
 
 		// Probability of the newRay
-		const float pdf = 1.0 / (2.0 * M_PI);
-
+		const float pdf = 1.0 / M_PI;
 		vec3 albedo = hit.matColor.xyz;
-		// Compute the BRDF for this ray (assuming Lambertian reflection)
+		vec3 BRDF = albedo / M_PI; // Compute the BRDF for this ray (assuming Lambertian reflection)
+
 		float cos_theta = dot(rayDirection, hit.normal);
-		vec3 BRDF = albedo / M_PI;
+		
 
 
 		indirectRay.rayOrigin = rayOrigin;
