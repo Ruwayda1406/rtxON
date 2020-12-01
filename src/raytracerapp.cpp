@@ -476,7 +476,7 @@ void RayTracerApp::LoadObj(String fileName) {
 					colorInfo.z = 1;
 
 					matInfo.z = 0.0;
-					matInfo.w = 1.0;//emiss
+					matInfo.w = 1.0;//emittance
 				}
 				else
 				{
@@ -492,8 +492,7 @@ void RayTracerApp::LoadObj(String fileName) {
 					colorInfo.x = 1;
 					colorInfo.y = 0;
 					colorInfo.z = 0;
-					colorInfo.w = 0.3;// alpha  1 == opaque; 0 == fully transparent
-					//matInfo.z = 2.0;//reflrect = 2
+					colorInfo.w = 0.2;// alpha  1 == opaque; 0 == fully transparent
 				}
 				else if (shape.name == "Sphere")
 				{
@@ -503,10 +502,6 @@ void RayTracerApp::LoadObj(String fileName) {
 				}
 				
 			}
-			//
-			
-
-
 			mesh.indices.Unmap();
 			mesh.attribs.Unmap();
 			mesh.positions.Unmap();

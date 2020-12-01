@@ -5,6 +5,7 @@
 // include vec & mat types (same namings as in GLSL)
 #include "framework/common.h"
 #endif // __cplusplus
+#define MAX_LIGHTS			 	100
 #define MAX_PATH_DEPTH			 	30
 #define MAX_PATH_TRACED			50
 #define MAX_ANTIALIASING_ITER   10
@@ -72,6 +73,7 @@ struct IndirectRayPayload {
 };
 struct ShadowRayPayload {
 	bool isShadowed;
+	float attenuation;
 };
 struct VertexAttribute {
     vec4 normal;

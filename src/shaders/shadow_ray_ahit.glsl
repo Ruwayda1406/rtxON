@@ -57,9 +57,15 @@ ShadingData getHitShadingData(uint objId)
 	return closestHit;
 }
 void main() {
-	/*const uint objId = gl_InstanceCustomIndexEXT;
+	const uint objId = gl_InstanceCustomIndexEXT;
+	float ShadowAttenuation = Params.LightInfo.y;
 	ShadingData hit = getHitShadingData(objId);
 	if (hit.matColor.w < 1.0)
-		ignoreIntersectionEXT();*/
+	{
+		ShadowRay.attenuation = mix(1.0, ShadowAttenuation, hit.matColor.w);
+		ignoreIntersectionEXT();
+	}
+	else
+		ShadowRay.attenuation = ShadowAttenuation;
 
 }

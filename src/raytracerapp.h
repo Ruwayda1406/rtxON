@@ -81,8 +81,10 @@ public:
 	float LightIntensity;
 	int size;
 	int width;
-	Light() :lightPos(vec3(0.0f, 0.40f, 1.0f)),ShadowAttenuation(0.1), LightIntensity(1.0f),width(5)
+	float step;
+	Light() :lightPos(vec3(0.0f, 0.40f, 1.0f)),ShadowAttenuation(0.3), LightIntensity(1.0f),width(5),step(0.01)
 	{
+
 		size = width * width;
 		LightSource = Array<vec4>(size);
 		createLightSource();
@@ -101,7 +103,7 @@ public:
 		{
 			for (int j = start; j < end; j++)
 			{
-				LightSource[index++] = vec4(lightPos + vec3(i/100.0, 0, j/100.0), LightIntensity);
+				LightSource[index++] = vec4(lightPos + (vec3(i, 0, j)*step), LightIntensity);
 			}
 		}
 	}

@@ -104,13 +104,14 @@ vec3 DiffuseShade(vec3 HitPosition, vec3 HitNormal, vec3 HitMatColor, float kd, 
 	// Get information about this light; access your framework’s scene structs
 	int LightCount = int(Params.LightInfo.x);
 	int LightType = int(Params.LightInfo.z);
-	float ShadowAttenuation = Params.LightInfo.y;
+	float prob = 1.0 / LightCount;
 	vec3 hitValues = vec3(0);
-	for (int i = 0; i < Params.LightInfo.x; i++)//SoftShadows
+
+
+	for (int j = 0; j < MAX_LIGHTS; j++)//SoftShadows
 	{
-
-		
-
+		float r1 = nextRand(PrimaryRay.rndSeed);
+		int i = int(clamp(r1*LightCount,0, LightCount));
 		vec3 lightPos = Params.LightSource[i].xyz;
 		vec3 dirToLight;
 		float distToLight, lightIntensity;
@@ -141,15 +142,16 @@ vec3 DiffuseShade(vec3 HitPosition, vec3 HitNormal, vec3 HitMatColor, float kd, 
 
 			const vec3 shadowRayOrigin = HitPosition + HitNormal * 0.001f;
 
+			ShadowRay.attenuation = attenuation;
 			bool isShadowed = shootShadowRay(shadowRayOrigin, dirToLight, 0.001, distToLight);
+			attenuation = ShadowRay.attenuation;
+
 			if (isShadowed)
 			{
-				attenuation = 0.3;
 				specular = vec3(0);
 			}
 			else
 			{
-				attenuation = 1.0;
 				specular = computeSpecular(gl_WorldRayDirectionEXT, dirToLight, HitNormal, vec3(ks), 100.0);
 			}
 		}
@@ -157,7 +159,7 @@ vec3 DiffuseShade(vec3 HitPosition, vec3 HitNormal, vec3 HitMatColor, float kd, 
 		hitValues += vec3(attenuation * lightIntensity * (diffuse + specular));
 	}
 
-	vec3 finalcolor = hitValues / float(LightCount);
+	vec3 finalcolor = hitValues / float(MAX_LIGHTS);
 	return finalcolor;
 }
 vec3 getRefractionNormal(vec3 I, vec3 N)
