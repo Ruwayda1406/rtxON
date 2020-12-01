@@ -45,7 +45,7 @@ void RayTracerApp::InitSettings() {
 
 void RayTracerApp::InitApp() {
 
-	this->LoadSceneGeometries();
+	this->LoadSceneGeometry();
     this->CreateScene();
 	this->CreateCamera();
     this->CreateDescriptorSetsLayouts();
@@ -318,13 +318,11 @@ bool RayTracerApp::CreateAS(const VkAccelerationStructureTypeKHR type,
 	
     return true;
 }
-void RayTracerApp::LoadSceneGeometries() {
+void RayTracerApp::LoadSceneGeometry() {
 
-//	mLight.LightPositions.clear();
 	mScene.meshes.clear(); 
-	LoadSceneGeometry(sScenesFolder + "fake_whitted.obj");
-
-	//LoadSceneGeometry(sScenesFolder + "bs_ears.obj");
+	//LoadObj(sScenesFolder + "test.obj");
+	LoadObj(sScenesFolder + "test2.obj");
 	// prepare shader resources infos
 	const size_t numMeshes = mScene.meshes.size();
 	mScene.meshInfoBufferInfos.resize(numMeshes);
@@ -349,7 +347,7 @@ void RayTracerApp::LoadSceneGeometries() {
 		meshInfo.range = mesh.infos.GetSize();
 	}
 }
-void RayTracerApp::LoadSceneGeometry(String fileName) {
+void RayTracerApp::LoadObj(String fileName) {
 	tinyobj::attrib_t attrib;
 	std::vector<tinyobj::shape_t> shapes;
 	std::vector<tinyobj::material_t> materials;
@@ -363,12 +361,11 @@ void RayTracerApp::LoadSceneGeometry(String fileName) {
 
 	const bool result = tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &error, fileName.c_str(), baseDir.c_str(), true);
 	if (result) {
-		int currentMeshNumer = 0;// mScene.meshes.size();
-		mScene.meshes.resize(currentMeshNumer+shapes.size());
+		int currentMeshNumer =0;
+		mScene.meshes.resize(shapes.size());
 
-		int meshIdx = currentMeshNumer;
 		for (size_t shapeIdx = 0; shapeIdx < shapes.size(); ++shapeIdx) {
-			RTMesh& mesh = mScene.meshes[meshIdx++];
+			RTMesh& mesh = mScene.meshes[shapeIdx];
 			const tinyobj::shape_t& shape = shapes[shapeIdx];
 
 			const size_t numFaces = shape.mesh.num_face_vertices.size();
@@ -469,22 +466,40 @@ void RayTracerApp::LoadSceneGeometry(String fileName) {
 				matInfo.y = getRandomFloat(0.3, 0.1);
 				matInfo.z = 0.0;
 				matInfo.w = 0.0;
-				
+
+				colorInfo.w = 1;// alpha  1 == opaque; 0 == fully transparent 
 
 				if (shape.name == "Light")
 				{
 					colorInfo.x = 1;
 					colorInfo.y = 1;
 					colorInfo.z = 1;
-					colorInfo.w = 1;// alpha 
-					matInfo.w = 1.0;
+
+					matInfo.z = 0.0;
+					matInfo.w = 1.0;//emiss
 				}
 				else
 				{
+
 					colorInfo.x = getRandomFloat(0.5, 1.0);
 					colorInfo.y = getRandomFloat(0.5, 1.0);
 					colorInfo.z = getRandomFloat(0.5, 1.0);
-					colorInfo.w = 1.0;
+
+				}
+
+				if (shape.name == "TMesh")
+				{
+					colorInfo.x = 1;
+					colorInfo.y = 0;
+					colorInfo.z = 0;
+					colorInfo.w = 0.3;// alpha  1 == opaque; 0 == fully transparent
+					//matInfo.z = 2.0;//reflrect = 2
+				}
+				else if (shape.name == "Sphere")
+				{
+					colorInfo.x = 0;
+					colorInfo.y = 0;
+					colorInfo.z = 1;
 				}
 				
 			}
@@ -809,21 +824,25 @@ void RayTracerApp::CreateRaytracingPipelineAndSBT() {
 	VkResult error = vkCreatePipelineLayout(mDevice, &pipelineLayoutCreateInfo, nullptr, &mRTPipelineLayout);
 	CHECK_VK_ERROR(error, "vkCreatePipelineLayout");
 
-	vulkanhelpers::Shader rayGenShader, rayChitShader, rayMissShader, rayAhitShader, shadowMiss, indirectChitShader, indirectMissShader;
+	vulkanhelpers::Shader rayGenShader, rayChitShader, rayMissShader, rayAhitShader, shadowMiss, shadowAhit, indirectChitShader, indirectMissShader;
     rayGenShader.LoadFromFile((sShadersFolder + "ray_gen.bin").c_str());
     rayChitShader.LoadFromFile((sShadersFolder + "ray_chit.bin").c_str());
-    rayAhitShader.LoadFromFile((sShadersFolder + "ray_anyhit.bin").c_str());
+    rayAhitShader.LoadFromFile((sShadersFolder + "ray_ahit.bin").c_str());
 	rayMissShader.LoadFromFile((sShadersFolder + "ray_miss.bin").c_str());
-	shadowMiss.LoadFromFile((sShadersFolder + "shadow_ray_miss.bin").c_str());
+	shadowAhit.LoadFromFile((sShadersFolder + "shadow_ray_ahit.bin").c_str());
+	shadowMiss.LoadFromFile((sShadersFolder + "shadow_ray_miss.bin").c_str());;
 	indirectChitShader.LoadFromFile((sShadersFolder + "indirect_ray_chit.bin").c_str());
 	indirectMissShader.LoadFromFile((sShadersFolder + "indirect_ray_miss.bin").c_str());
 
 
-    mShaderBindingTable.Initialize(2,3, mRTProps.shaderGroupHandleSize, mRTProps.shaderGroupBaseAlignment);
+    mShaderBindingTable.Initialize(3,3, mRTProps.shaderGroupHandleSize, mRTProps.shaderGroupBaseAlignment);
     mShaderBindingTable.SetRaygenStage(rayGenShader.GetShaderStage(VK_SHADER_STAGE_RAYGEN_BIT_KHR));
 
-	mShaderBindingTable.AddStageToHitGroup({ rayChitShader.GetShaderStage(VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR), rayAhitShader.GetShaderStage(VK_SHADER_STAGE_ANY_HIT_BIT_KHR) }, SWS_PRIMARY_HIT_SHADERS_IDX);
+	mShaderBindingTable.AddStageToHitGroup({ rayChitShader.GetShaderStage(VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR), 
+		rayAhitShader.GetShaderStage(VK_SHADER_STAGE_ANY_HIT_BIT_KHR) }, SWS_PRIMARY_HIT_SHADERS_IDX);
+
 	mShaderBindingTable.AddStageToHitGroup({ indirectChitShader.GetShaderStage(VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR) }, SWS_INDIRECT_HIT_SHADERS_IDX);
+	mShaderBindingTable.AddStageToHitGroup({ shadowAhit.GetShaderStage(VK_SHADER_STAGE_ANY_HIT_BIT_KHR) }, SWS_SHADOW_HIT_SHADERS_IDX);
 
 	mShaderBindingTable.AddStageToMissGroup(rayMissShader.GetShaderStage(VK_SHADER_STAGE_MISS_BIT_KHR), SWS_PRIMARY_MISS_SHADERS_IDX);
 	mShaderBindingTable.AddStageToMissGroup(indirectMissShader.GetShaderStage(VK_SHADER_STAGE_MISS_BIT_KHR), SWS_INDIRECT_MISS_SHADERS_IDX);

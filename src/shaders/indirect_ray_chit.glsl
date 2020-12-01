@@ -27,7 +27,9 @@ layout(set = SWS_UNIFORMPARAMS_SET, binding = SWS_UNIFORMPARAMS_BINDING, std140)
 	UniformParams Params;
 };
 
+layout(location = SWS_LOC_PRIMARY_RAY) rayPayloadEXT RayPayload PrimaryRay;
 layout(location = SWS_LOC_INDIRECT_RAY) rayPayloadInEXT IndirectRayPayload indirectRay;
+layout(location = SWS_LOC_INDIRECT_RAY2) rayPayloadInEXT IndirectRayPayload indirectRay2;
 
 hitAttributeEXT vec2 HitAttribs;
 ShadingData getHitShadingData(uint objId)
@@ -57,7 +59,7 @@ ShadingData getHitShadingData(uint objId)
 
 	return closestHit;
 }
-vec3 shootRay(vec3 rayOrigin, vec3 rayDirection, float min, float max, uint rndSeed)
+vec3 shootRay(vec3 rayOrigin, vec3 rayDirection, float min, float max)
 {
 	const uint rayFlags = gl_RayFlagsOpaqueEXT;// gl_RayFlagsNoneEXT; ;// gl_RayFlagsOpaqueEXT;
 
@@ -65,7 +67,7 @@ vec3 shootRay(vec3 rayOrigin, vec3 rayDirection, float min, float max, uint rndS
 	const uint stbRecordStride = 1;
 	const float tmin = min;
 	const float tmax = max;// Camera.nearFarFov.y;
-
+	indirectRay2.rndSeed = indirectRay.rndSeed;
 	traceRayEXT(Scene,
 		rayFlags,
 		cullMask,
@@ -76,9 +78,10 @@ vec3 shootRay(vec3 rayOrigin, vec3 rayDirection, float min, float max, uint rndS
 		tmin,
 		rayDirection,
 		tmax,
-		SWS_LOC_INDIRECT_RAY);
+		SWS_LOC_INDIRECT_RAY2);
 
-	return indirectRay.hitValue;
+	indirectRay.rndSeed=indirectRay2.rndSeed;
+	return indirectRay2.hitValue;
 
 }
 
@@ -98,7 +101,7 @@ void main() {
 		createCoordinateSystem(hit.normal, tangent, bitangent);
 		//the newRay
 		vec3 rayOrigin = hit.pos;
-		vec3 rayDirection = samplingHemisphere(indirectRay.rndSeed, tangent, bitangent, hit.normal);
+		vec3 rayDirection = samplingHemisphere(PrimaryRay.rndSeed, tangent, bitangent, hit.normal);
 
 		// Probability of the newRay
 		const float pdf = 1.0 / (2.0 * M_PI);
@@ -118,10 +121,9 @@ void main() {
 		{
 			indirectRay.weight *= (BRDF * cos_theta / pdf);
 			indirectRay.rayDepth++;
-			incoming = shootRay(indirectRay.rayOrigin, indirectRay.rayDir, 0.0001, 10000.0, indirectRay.rndSeed);
+			incoming = shootRay(indirectRay.rayOrigin, indirectRay.rayDir, 0.0001, 10000.0);
 		}
 		// Apply the Rendering Equation here.
 		indirectRay.hitValue = hit.emittance + (incoming * weight);
-		
 	}
 }

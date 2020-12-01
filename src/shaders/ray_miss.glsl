@@ -10,7 +10,9 @@ layout(set = SWS_UNIFORMPARAMS_SET, binding = SWS_UNIFORMPARAMS_BINDING, std140)
 };
 
 void main() {
-
+	//if (PrimaryRay.isTransparent)
+	//	PrimaryRay.hitValue = PrimaryRay.accColor.xyz;
+	//else
 	PrimaryRay.hitValue = vec3(Params.clearColor);
 	PrimaryRay.isMiss = true;
 }

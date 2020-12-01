@@ -64,7 +64,7 @@ ShadingData getHitShadingData(uint objId)
 
 	// Computing the normal at hit position
 	closestHit.normal = normalize(BaryLerp(v0.normal.xyz, v1.normal.xyz, v2.normal.xyz, barycentrics));
-	//const vec2 uv = BaryLerp(v0.uv.xy, v1.uv.xy, v2.uv.xy, barycentrics);
+	closestHit.pos = gl_WorldRayOriginEXT + gl_WorldRayDirectionEXT * gl_HitTEXT;
 	closestHit.matColor = meshInfoArray[objId].info[0];
 
 	closestHit.kd = meshInfoArray[objId].info[1].x;
@@ -72,13 +72,14 @@ ShadingData getHitShadingData(uint objId)
 	closestHit.mat = int(meshInfoArray[objId].info[1].z);
 	closestHit.emittance = vec3(meshInfoArray[objId].info[1].w);
 
-	closestHit.pos = gl_WorldRayOriginEXT + gl_WorldRayDirectionEXT * gl_HitTEXT;
+	
+
 
 	return closestHit;
 }
 bool shootShadowRay(vec3 shadowRayOrigin, vec3 dirToLight, float min, float distToLight)
 {
-	const uint shadowRayFlags = gl_RayFlagsOpaqueEXT | gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT;
+	const uint shadowRayFlags = gl_RayFlagsNoOpaqueEXT | gl_RayFlagsSkipClosestHitShaderEXT;
 	const uint cullMask = 0xFF;
 	const uint stbRecordStride = 1;
 	const float tmin = min;
@@ -87,7 +88,7 @@ bool shootShadowRay(vec3 shadowRayOrigin, vec3 dirToLight, float min, float dist
 	traceRayEXT(Scene,
 		shadowRayFlags,
 		cullMask,
-		0,
+		SWS_SHADOW_HIT_SHADERS_IDX,
 		stbRecordStride,
 		SWS_SHADOW_MISS_SHADERS_IDX,
 		shadowRayOrigin,
@@ -108,23 +109,21 @@ vec3 DiffuseShade(vec3 HitPosition, vec3 HitNormal, vec3 HitMatColor, float kd, 
 	for (int i = 0; i < Params.LightInfo.x; i++)//SoftShadows
 	{
 
-		vec3 lightPos, dirToLight;
+		
+
+		vec3 lightPos = Params.LightSource[i].xyz;
+		vec3 dirToLight;
 		float distToLight, lightIntensity;
 		if (LightType == 0)// Point light
 		{
-			lightPos = Params.LightSource[i].xyz;
-			distToLight = length(lightPos - HitPosition);
 			dirToLight = normalize(lightPos - HitPosition);
-
-			lightIntensity = Params.LightSource[i].w;
-			lightIntensity = lightIntensity / (distToLight * distToLight);
+			distToLight = length(lightPos - HitPosition);
+			lightIntensity = Params.LightSource[i].w / (distToLight * distToLight);
 		}
 		else  // Directional light
 		{
-			lightPos = Params.LightSource[i].xyz;
-			distToLight = 100000000;
-			dirToLight = normalize(lightPos - vec3(0)); // normalize(-pushC.lightDirection)
-
+			dirToLight = normalize(lightPos - vec3(0)); 
+			distToLight = 10000;
 			lightIntensity = 1.0;
 		}
 		//====================================================================
@@ -133,9 +132,10 @@ vec3 DiffuseShade(vec3 HitPosition, vec3 HitNormal, vec3 HitMatColor, float kd, 
 
 		// Tracing shadow ray only if the light is visible from the surface
 		vec3  specular = vec3(0);
-		float attenuation = 1.0;
-
-		if (dot(HitNormal, dirToLight) > 0.0)
+		float attenuation = 1;
+		float rayColor = 0.0;
+		float LdotN = dot(HitNormal, dirToLight);
+		if (LdotN > 0.0)
 		{
 
 
@@ -144,20 +144,52 @@ vec3 DiffuseShade(vec3 HitPosition, vec3 HitNormal, vec3 HitMatColor, float kd, 
 			bool isShadowed = shootShadowRay(shadowRayOrigin, dirToLight, 0.001, distToLight);
 			if (isShadowed)
 			{
-				attenuation = ShadowAttenuation;
+				attenuation = 0.3;
+				specular = vec3(0);
 			}
 			else
 			{
-				// Specular
+				attenuation = 1.0;
 				specular = computeSpecular(gl_WorldRayDirectionEXT, dirToLight, HitNormal, vec3(ks), 100.0);
 			}
 		}
-		hitValues += vec3(lightIntensity * attenuation * (diffuse + specular));
+
+		hitValues += vec3(attenuation * lightIntensity * (diffuse + specular));
 	}
+
 	vec3 finalcolor = hitValues / float(LightCount);
 	return finalcolor;
 }
+vec3 getRefractionNormal(vec3 I, vec3 N)
+{
+	//https://www.scratchapixel.com/lessons/3d-basic-rendering/introduction-to-shading/reflection-refraction-fresnel
+	float cosi = clamp(-1, 1, dot(I, N));//NdotD
+
+	vec3 refrNormal;
+	if (cosi < 0)
+	{
+		refrNormal = N;
+	}
+	else {
+		refrNormal = -N;
+	}
+	return refrNormal;
+}
+float getRefractionEta(vec3 I, vec3 N, float k)//ior=index of refraction 
+{
+	float cosi = clamp(-1, 1, dot(I, N));
+	float refrEta;
+	if (cosi < 0)
+	{
+		refrEta = k;
+	}
+	else { 
+		refrEta = 1.0/k;
+	}
+	return refrEta;
+}
 void main() {
+
 	PrimaryRay.isMiss = false;
 	const uint objId = gl_InstanceCustomIndexEXT;
 	ShadingData hit = getHitShadingData(objId);
@@ -173,70 +205,33 @@ void main() {
 		PrimaryRay.rayOrigin = origin;
 		PrimaryRay.rayDir = rayDir;
 	}
+	else if (hit.mat == 2)
+	{
+		float k_glass = 1.5;
+		float NdotD = dot(hit.normal, gl_WorldRayDirectionEXT);
+		float cosi = clamp(-1, 1, NdotD);
 
+		vec3 refrNormal = getRefractionNormal(gl_WorldRayDirectionEXT, hit.normal);
+		float refrEta = getRefractionEta(gl_WorldRayDirectionEXT, hit.normal, k_glass);
+
+		vec3 origin = hit.pos;
+		vec3 rayDir = refract(gl_WorldRayDirectionEXT, refrNormal, refrEta);
+		PrimaryRay.done = false;
+		PrimaryRay.rayOrigin = origin;
+		PrimaryRay.rayDir = rayDir;
+	}
+}
+/*
+vec3 reflection(vec3 I, vec3 N)
+{
+	return I - 2.0 * dot(I, N) * N;
 }
 
 
-
-
-
-
-
-
-/*else if (mat == 2)
+vec3 refract(vec3 I, vec3 N, float eta)
 {
-	const float NdotD = dot(normal, gl_WorldRayDirectionEXT);
-
-	vec3 refrNormal;
-	float refrEta;
-	const float kIceIndex = 1.0f / 1.31f;
-	if (NdotD > 0.0f) {
-		refrNormal = -normal;
-		refrEta = 1.0f / kIceIndex;
-	}
-	else {
-		refrNormal = normal;
-		refrEta = kIceIndex;
-	}
-
-	vec3 origin = pos;
-	vec3 rayDir = refract(gl_WorldRayDirectionEXT, refrNormal, refrEta);
-	PrimaryRay.done = false;
-	PrimaryRay.rayOrigin = origin;
-	PrimaryRay.rayDir = rayDir;
-}*/
-
-/*
-vec3 DiffuseShade2(vec3 pos, vec3 normal, vec3 difColor, float kd, float ks, uint rndSeed)
-{
-	const float M_PI = 3.1415926536f;
-	int LightsCount = int(Params.LightInfo.x);
-	// We will only shoot one shadow ray per frame, randomly to a light
-	uint randomLight = uint(nextRand(rndSeed) * LightsCount);
-	// What is the probability we picked that light?
-	float sampleProb = 1.0f / float(LightsCount);
-
-	// Get information about this light; access your framework’s scene structs
-	vec3 lightIntensity = vec3(Params.LightSource[randomLight].w);
-	vec3 lightPos = Params.LightSource[randomLight].xyz;
-	//float distToLight = length(lightPos - pos);
-	//vec3 dirToLight = normalize(lightPos - pos);	float distToLight = length(lightPos - vec3(0));
-	vec3 dirToLight = normalize(lightPos - vec3(0));
-	// Compute our NdotL term; shoot our shadow ray in selected direction
-	// Compute our NdotL term; shoot our shadow ray in selected direction
-	float NdotL = clamp(dot(normal, dirToLight), 0.0, 1.0); // In range [0..1]
-	bool isLit = shootShadowRay(pos, dirToLight, 0.0001, distToLight);
-	vec3 rayColor;
-
-	if (isLit)
-	{
-		rayColor = lightIntensity;
-	}
-	else
-	{
-		rayColor = vec3(0.0);
-
-	}
-	// Return shaded color
-	return (NdotL * rayColor * (difColor / M_PI)) / sampleProb;
-}*/
+	float cosi=dot(N, I);
+    float k = 1 - eta * eta * (1 - cosi * cosi);
+	return k < 0 ? 0 : eta * I + (eta * cosi - sqrtf(k)) * n;
+}
+*/

@@ -81,7 +81,7 @@ public:
 	float LightIntensity;
 	int size;
 	int width;
-	Light() :lightPos(vec3(0.0f, 0.40f, 1.0f)),ShadowAttenuation(0.3), LightIntensity(0.1f),width(5)
+	Light() :lightPos(vec3(0.0f, 0.40f, 1.0f)),ShadowAttenuation(0.1), LightIntensity(1.0f),width(5)
 	{
 		size = width * width;
 		LightSource = Array<vec4>(size);
@@ -127,8 +127,8 @@ private:
                   const VkAccelerationStructureCreateGeometryTypeInfoKHR* geometries,
                   const uint32_t instanceCount,
                   RTAccelerationStructure& _as);
-	void LoadSceneGeometries();
-	void LoadSceneGeometry(String fileName);
+	void LoadSceneGeometry();
+	void LoadObj(String fileName);
 	void CreateCamera();
 	void CreateScene();
     void CreateDescriptorSetsLayouts();

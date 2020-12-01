@@ -14,7 +14,7 @@
 #define SWS_INDIRECT_HIT_SHADERS_IDX     1
 #define SWS_INDIRECT_MISS_SHADERS_IDX    1
 
-//#define SWS_SHADOW_HIT_SHADERS_IDX       2
+#define SWS_SHADOW_HIT_SHADERS_IDX       2
 #define SWS_SHADOW_MISS_SHADERS_IDX      2
 ///////////////////////////////////////////
 // resource locations
@@ -42,11 +42,13 @@
 #define SWS_LOC_HIT_ATTRIBS             1
 #define SWS_LOC_SHADOW_RAY              2
 #define SWS_LOC_INDIRECT_RAY            3
-#define SWS_LOC_INDIRECT_RAY_2          4
+#define SWS_LOC_INDIRECT_RAY2            4
+
 #define SWS_MAX_RECURSION               10
 //////////////////////////////////////////
 struct RayPayload {
-	vec4 accColor;// used in anyhit
+	uint rndSeed;// used in anyhit
+	//vec4 accColor;
     vec3 hitValue;
 	bool isMiss;
 	vec3 matColor;
