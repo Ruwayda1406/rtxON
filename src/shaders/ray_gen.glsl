@@ -8,7 +8,7 @@
 
 layout(set = SWS_SCENE_AS_SET, binding = SWS_SCENE_AS_BINDING)            uniform accelerationStructureEXT Scene;
 layout(set = SWS_RESULT_IMAGE_SET, binding = SWS_RESULT_IMAGE_BINDING, rgba8) uniform image2D ResultImage;
-uint rndSeed;
+
 layout(set = SWS_CAMDATA_SET, binding = SWS_CAMDATA_BINDING, std140)     uniform CameraData{
 	CameraUniformParams Camera;
 };
@@ -43,7 +43,7 @@ vec3 shootColorRay(vec3 rayOrigin, vec3 rayDirection, float min, float max)
 	PrimaryRay.hitValue = vec3(0);
 	PrimaryRay.attenuation = 1.f;
 	//PrimaryRay.accColor = vec4(0);
-	PrimaryRay.rndSeed = rndSeed;
+	
 
 	vec3 hitValue = vec3(0);
 	for (int i = 0; i < SWS_MAX_RECURSION; i++)//for reflective material 
@@ -61,7 +61,6 @@ vec3 shootColorRay(vec3 rayOrigin, vec3 rayDirection, float min, float max)
 			SWS_LOC_PRIMARY_RAY);
 
 		hitValue += PrimaryRay.hitValue * PrimaryRay.attenuation;
-		rndSeed = PrimaryRay.rndSeed;
 		if (PrimaryRay.done)
 			break;
 		
@@ -74,8 +73,9 @@ vec3 shootColorRay(vec3 rayOrigin, vec3 rayDirection, float min, float max)
 	return hitValue;
 
 }
-vec3 computeDirectLighting()
+vec3 raytracer(uint rndSeed)
 {
+
 	// Do diffuse shading at the primary hit
 	// monte carlo antialiasing
 	vec3 hitValues = vec3(0);
@@ -93,13 +93,15 @@ vec3 computeDirectLighting()
 		// Initialize a ray structure for our ray tracer
 		vec3 origin = Camera.pos.xyz;
 		vec3 direction = CalcRayDir(pixel, aspect);
-		vec3  hitValue = shootColorRay(origin, direction, 0.0001, 10000.0);
-		hitValues += hitValue;
+
+		PrimaryRay.rndSeed = rndSeed;
+		hitValues += shootColorRay(origin, direction, 0.0001, 10000.0);
+		rndSeed = PrimaryRay.rndSeed;
 
 	}
 	return ( hitValues / float(MAX_ANTIALIASING_ITER));
 }
-vec3 computeIndirectLigthing()
+vec3 pathtracer(uint rndSeed)
 {
 	const vec2 uv = vec2(gl_LaunchIDEXT.xy);
 	const vec2 pixel = uv / (gl_LaunchSizeEXT.xy - 1.0);
@@ -159,21 +161,17 @@ void main() {
 	// Initialize the random number
 	uint rndSeed = tea(gl_LaunchIDEXT.y * gl_LaunchSizeEXT.x + gl_LaunchIDEXT.x, int(clockARB()));
 
-	vec3 directLighting = computeDirectLighting();
-	vec3 color = directLighting;
+
+	vec3 color = vec3(0.3);
 
 
-	vec3 indirectLigthing = vec3(0);
-	if (mode == 2|| mode==3)
+	if (mode == 1)
 	{
-		vec3 matColor = PrimaryRay.matColor;
-		//path tracer
-		vec3 indirectLigthing = computeIndirectLigthing();
-		color = (directLighting + indirectLigthing);// *matColor;
-		if (mode == 3)
-		{
-			color = indirectLigthing;
-		}
+		color = raytracer(rndSeed);
+	}
+	else if (mode == 2)
+	{
+		color = pathtracer(rndSeed);
 	}
 
 	// Do accumulation over time
