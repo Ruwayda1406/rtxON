@@ -6,7 +6,7 @@
 #include "framework/common.h"
 #endif // __cplusplus
 #define MAX_LIGHTS			 	30
-#define MAX_PATH_DEPTH			 	30
+#define MAX_PATH_DEPTH			 	5
 #define MAX_PATH_TRACED			100
 #define MAX_ANTIALIASING_ITER   10
 //

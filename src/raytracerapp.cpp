@@ -472,7 +472,6 @@ void RayTracerApp::LoadObj(String fileName) {
 					colorInfo.y = 1;
 					colorInfo.z = 1;
 
-					matInfo.z = 0.0;
 					matInfo.w = 1.0;//emittance
 				}
 				else

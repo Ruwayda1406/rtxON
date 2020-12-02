@@ -80,46 +80,62 @@ vec3 shootRay(vec3 rayOrigin, vec3 rayDirection, float min, float max)
 	return indirectRay.hitValue;
 
 }
+void DiffuseBRDF(vec3 rayOrigin, vec3 weight, vec3 emittance, ShadingData hit)
+{
+	//https://en.wikipedia.org/wiki/Path_tracing
+		//https://www.scratchapixel.com/lessons/3d-basic-rendering/global-illumination-path-tracing/global-illumination-path-tracing-practical-implementation
+		//vec3 directLightContrib = DiffuseShade(hit.pos, hit.normal, hit.matColor.xyz, hit.kd, hit.ks);
+		// Pick a random direction from here and keep going.
+	vec3 tangent, bitangent;
+	createCoordinateSystem(hit.normal, tangent, bitangent);
+	//the newRay Direction
+	vec3 rayDirection = samplingHemisphere(indirectRay.rndSeed, tangent, bitangent, hit.normal);
 
+	// Probability of the newRay
+	const float pdf = 1.0 / M_PI;
+
+	vec3 albedo = hit.matColor.xyz;
+	vec3 BRDF = albedo / M_PI; // Compute the BRDF for this ray (assuming Lambertian reflection)
+	float cos_theta = dot(rayDirection, hit.normal);
+
+
+
+	indirectRay.rayOrigin = rayOrigin;
+	indirectRay.rayDir = rayDirection;
+	vec3 incoming = emittance;
+	// Recursively trace reflected light sources.
+	if (indirectRay.rayDepth + 1.0 < MAX_PATH_DEPTH)
+	{
+		indirectRay.weight *= (BRDF * cos_theta / pdf);
+		indirectRay.rayDepth++;
+		incoming = shootRay(indirectRay.rayOrigin, indirectRay.rayDir, 0.0001, 10000.0);
+	}
+	// Apply the Rendering Equation here.
+	indirectRay.hitValue = hit.emittance + (incoming * weight);
+}
 void main() {
 	indirectRay.isMiss = false;
-	if (indirectRay.rayDepth > MAX_PATH_DEPTH)
+	if (indirectRay.rayDepth >= MAX_PATH_DEPTH) {
 		indirectRay.hitValue = vec3(0);
+		return;
+	}
 	else
 	{
+		// Russian roulette: starting at depth MAX_PATH_DEPTH, each recursive step will stop with a probability of 0.1
 		const uint objId = gl_InstanceCustomIndexEXT;
 		ShadingData hit = getHitShadingData(objId);
-		//https://en.wikipedia.org/wiki/Path_tracing
-	    //https://www.scratchapixel.com/lessons/3d-basic-rendering/global-illumination-path-tracing/global-illumination-path-tracing-practical-implementation
-		//vec3 directLightContrib = DiffuseShade(hit.pos, hit.normal, hit.matColor.xyz, hit.kd, hit.ks);
-	    // Pick a random direction from here and keep going.
-		vec3 tangent, bitangent;
-		createCoordinateSystem(hit.normal, tangent, bitangent);
-		//the newRay
 		vec3 rayOrigin = hit.pos;
-		vec3 rayDirection = samplingHemisphere(indirectRay.rndSeed, tangent, bitangent, hit.normal);
-
-		// Probability of the newRay
-		const float pdf = 1.0 / M_PI;
-		vec3 albedo = hit.matColor.xyz;
-		vec3 BRDF = albedo / M_PI; // Compute the BRDF for this ray (assuming Lambertian reflection)
-
-		float cos_theta = dot(rayDirection, hit.normal);
-		
-
-
-		indirectRay.rayOrigin = rayOrigin;
-		indirectRay.rayDir = rayDirection;
-		vec3 incoming = hit.emittance;
 		vec3 weight = indirectRay.weight;
-		// Recursively trace reflected light sources.
-		if (indirectRay.rayDepth + 1.0 < MAX_PATH_DEPTH)
+		// Add the emission, the L_e(x,w) part of the rendering equation, but scale it with the Russian Roulette
+	    // probability weight.
+		vec3 emittance = hit.emittance * weight;
+
+		if (hit.mat == 0)// Reflection
 		{
-			indirectRay.weight *= (BRDF * cos_theta / pdf);
-			indirectRay.rayDepth++;
-			incoming = shootRay(indirectRay.rayOrigin, indirectRay.rayDir, 0.0001, 10000.0);
+			// Diffuse BRDF - choose an outgoing direction with hemisphere sampling.
+			DiffuseBRDF(rayOrigin, weight, emittance,hit);
 		}
-		// Apply the Rendering Equation here.
-		indirectRay.hitValue = hit.emittance + (incoming * weight);
+		
+		
 	}
 }
