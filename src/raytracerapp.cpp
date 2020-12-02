@@ -246,7 +246,7 @@ void RayTracerApp::CreateCamera() {
 	mCamera.SetViewport({ 0, 0, static_cast<int>(mSettings.resolutionX), static_cast<int>(mSettings.resolutionY) });
 	mCamera.SetViewPlanes(0.1f, 1000.0f);
 	mCamera.SetFovY(45.0f);
-	mCamera.LookAt(vec3(-5.0f, 3.0f, 10.0f), vec3(-5.0f, 3.0f, 9.0f));
+	mCamera.LookAt(vec3(-5.0f, 3.0f, 8), vec3(-5.0f, 3.0f, 7.0f));
 
 	/////////////////////////////////////////
 	error = mUniformParamsBuffer.Create(sizeof(UniformParams), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_RAY_TRACING_BIT_KHR, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
@@ -445,7 +445,7 @@ void RayTracerApp::LoadObj(String fileName) {
 				matInfo.z = 0.0;
 				matInfo.w = 0.0;
 			}
-			else if (shape.name == "Mirror")
+			else if (shape.name == "Mirror1"|| shape.name == "Mirror2")
 			{
 				colorInfo.x = 1.0;
 				colorInfo.y = 1.0;

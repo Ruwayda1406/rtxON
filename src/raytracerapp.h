@@ -78,7 +78,7 @@ public:
 	float ShadowAttenuation;
 	vec3 lightPos;
 	float LightIntensity;
-	Light() :lightPos(vec3(0.0f, 0.40f, 1.0f)),ShadowAttenuation(0.1), LightIntensity(0.9f)
+	Light() :lightPos(vec3(0.0f, 0.40f, 1.0f)),ShadowAttenuation(0.1), LightIntensity(1.0f)
 	{
 	}
 	void move(vec3 step)

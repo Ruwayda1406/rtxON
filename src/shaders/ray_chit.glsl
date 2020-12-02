@@ -124,8 +124,9 @@ vec3 DiffuseShade(vec3 HitPosition, vec3 HitNormal, vec3 HitMatColor, float kd, 
 		else  // Directional light
 		{
 			dirToLight = normalize(lightPos - vec3(0)); 
-			distToLight = 10000;
-			lightIntensity = 1.0;
+			distToLight = length(lightPos - vec3(0));
+			//distToLight = 10000;
+			lightIntensity = Params.LightPos.w;
 		}
 		//====================================================================
 		// Diffuse
