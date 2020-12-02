@@ -12,10 +12,10 @@ layout(set = SWS_UNIFORMPARAMS_SET, binding = SWS_UNIFORMPARAMS_BINDING, std140)
 
 void main() {
 	indirectRay.hitValue = vec3(Params.clearColor);
-	indirectRay.isMiss = true;
 	if (indirectRay.rayDepth > 0) //first iteration 
 	{
 		indirectRay.hitValue = vec3(0.001);  // No contribution from environment
-		indirectRay.rayDepth = MAX_PATH_DEPTH;
+		
 	}
+	indirectRay.rayDepth = MAX_PATH_DEPTH;
 }

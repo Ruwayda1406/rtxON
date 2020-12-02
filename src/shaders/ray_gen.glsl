@@ -1,6 +1,7 @@
 #version 460
 #extension GL_EXT_ray_tracing : enable
 #extension GL_GOOGLE_include_directive : require
+#extension GL_ARB_shader_clock : enable
 
 #include "../shared.h"
 #include "random.glsl"
@@ -122,10 +123,10 @@ vec3 computeIndirectLigthing()
 
 		vec3 rayOrigin = origin.xyz;
 		vec3 rayDirection = direction.xyz;
-		indirectRay.weight = vec3(1);
+		indirectRay.weight = vec3(0);
 		indirectRay.rayDepth = 0;
-
-		//vec3 curWeight = vec3(1);
+		indirectRay.hitValue = vec3(0);
+		vec3 curWeight = vec3(1);
 		for (; indirectRay.rayDepth< MAX_PATH_DEPTH; indirectRay.rayDepth++)
 		{
 			
@@ -141,9 +142,8 @@ vec3 computeIndirectLigthing()
 				tmax,
 				SWS_LOC_INDIRECT_RAY);
 
-			hitValues += indirectRay.hitValue;// *curWeight;
-			//curWeight *= indirectRay.weight;
-			//rndSeed = indirectRay.rndSeed;
+			hitValues += indirectRay.hitValue *curWeight;
+			curWeight *= indirectRay.weight;
 			rayOrigin = indirectRay.rayOrigin;
 			rayDirection = indirectRay.rayDir;
 		}
@@ -155,7 +155,9 @@ vec3 computeIndirectLigthing()
 void main() {
 	int mode = int(Params.modeFrame.x);
 	float deltaTime = Params.modeFrame.y;
-	uint rndSeed = tea(gl_LaunchIDEXT.y * gl_LaunchSizeEXT.x + gl_LaunchIDEXT.x, int(deltaTime));
+	//uint rndSeed = tea(gl_LaunchIDEXT.y * gl_LaunchSizeEXT.x + gl_LaunchIDEXT.x, int(deltaTime));
+	// Initialize the random number
+	uint rndSeed = tea(gl_LaunchIDEXT.y * gl_LaunchSizeEXT.x + gl_LaunchIDEXT.x, int(clockARB()));
 
 	vec3 directLighting = computeDirectLighting();
 	vec3 color = directLighting;
@@ -167,7 +169,7 @@ void main() {
 		vec3 matColor = PrimaryRay.matColor;
 		//path tracer
 		vec3 indirectLigthing = computeIndirectLigthing();
-		color = (directLighting + indirectLigthing)*matColor;
+		color = (directLighting + indirectLigthing);// *matColor;
 		if (mode == 3)
 		{
 			color = indirectLigthing;

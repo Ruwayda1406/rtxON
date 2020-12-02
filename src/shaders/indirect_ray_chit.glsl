@@ -58,13 +58,15 @@ ShadingData getHitShadingData(uint objId)
 
 	return closestHit;
 }
-vec3 shootRay(vec3 rayOrigin, vec3 rayDirection, float min, float max)
+vec3 shootRay(vec3 rayOrigin, vec3 rayDirection, int depth)
 {
+
 	const uint rayFlags = gl_RayFlagsOpaqueEXT;
 	const uint cullMask = 0xFF;
 	const uint stbRecordStride = 1;
-	const float tmin = min;
-	const float tmax = max;// Camera.nearFarFov.y;
+	const float tmin = 0.001;
+	const float tmax = 100000000.0;
+	indirectRay.rayDepth = depth;
 	traceRayEXT(Scene,
 		rayFlags,
 		cullMask,
@@ -80,7 +82,7 @@ vec3 shootRay(vec3 rayOrigin, vec3 rayDirection, float min, float max)
 	return indirectRay.hitValue;
 
 }
-void DiffuseBRDF(vec3 rayOrigin, vec3 weight, vec3 emittance, ShadingData hit)
+void DiffuseBRDF(vec3 rayOrigin, ShadingData hit)
 {
 	//https://en.wikipedia.org/wiki/Path_tracing
 		//https://www.scratchapixel.com/lessons/3d-basic-rendering/global-illumination-path-tracing/global-illumination-path-tracing-practical-implementation
@@ -91,24 +93,24 @@ void DiffuseBRDF(vec3 rayOrigin, vec3 weight, vec3 emittance, ShadingData hit)
 	//the newRay Direction
 	vec3 rayDirection = samplingHemisphere(indirectRay.rndSeed, tangent, bitangent, hit.normal);
 
-	// Probability of the newRay
-	const float pdf = 1.0 / M_PI;
-
-	vec3 albedo = hit.matColor.xyz;
-	vec3 BRDF = albedo / M_PI; // Compute the BRDF for this ray (assuming Lambertian reflection)
+	// Probability of the newRay (cosine distributed)
+	const float p = 1.0 / (2.0*M_PI);
+	// Compute the BRDF for this ray (assuming Lambertian reflection)
+	vec3 BRDF = hit.matColor.xyz / M_PI; 
 	float cos_theta = dot(rayDirection, hit.normal);
-
+	vec3 weight = (BRDF * cos_theta / p);
 
 
 	indirectRay.rayOrigin = rayOrigin;
 	indirectRay.rayDir = rayDirection;
-	vec3 incoming = emittance;
+	indirectRay.weight = weight;
+	indirectRay.hitValue = hit.emittance;
+
+	vec3 incoming = hit.emittance;
 	// Recursively trace reflected light sources.
-	if (indirectRay.rayDepth + 1.0 < MAX_PATH_DEPTH)
-	{
-		indirectRay.weight *= (BRDF * cos_theta / pdf);
-		indirectRay.rayDepth++;
-		incoming = shootRay(indirectRay.rayOrigin, indirectRay.rayDir, 0.0001, 10000.0);
+	if (indirectRay.rayDepth < MAX_PATH_DEPTH)
+	{	
+		incoming = shootRay(indirectRay.rayOrigin, indirectRay.rayDir, indirectRay.rayDepth+1);
 	}
 	// Apply the Rendering Equation here.
 	indirectRay.hitValue = hit.emittance + (incoming * weight);
@@ -116,7 +118,7 @@ void DiffuseBRDF(vec3 rayOrigin, vec3 weight, vec3 emittance, ShadingData hit)
 void main() {
 	indirectRay.isMiss = false;
 	if (indirectRay.rayDepth >= MAX_PATH_DEPTH) {
-		indirectRay.hitValue = vec3(0);
+		indirectRay.hitValue = vec3(0.001);
 		return;
 	}
 	else
@@ -125,15 +127,13 @@ void main() {
 		const uint objId = gl_InstanceCustomIndexEXT;
 		ShadingData hit = getHitShadingData(objId);
 		vec3 rayOrigin = hit.pos;
-		vec3 weight = indirectRay.weight;
 		// Add the emission, the L_e(x,w) part of the rendering equation, but scale it with the Russian Roulette
 	    // probability weight.
-		vec3 emittance = hit.emittance * weight;
 
-		if (hit.mat == 0)// Reflection
+		//if (hit.mat == 0)
 		{
 			// Diffuse BRDF - choose an outgoing direction with hemisphere sampling.
-			DiffuseBRDF(rayOrigin, weight, emittance,hit);
+			DiffuseBRDF(rayOrigin,hit);
 		}
 		
 		
