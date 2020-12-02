@@ -213,10 +213,6 @@ void SpecularBRDF(ShadingData hit)
 	float cos_theta = dot(rayDirection, hit.normal);
 	// Probability of the newRay (cosine distributed)
 	const float p = 1 / M_PI;
-	// Compute the BRDF for this ray (assuming Lambertian reflection)
-	//vec3 diffColor = DiffuseShade(hit.pos, hit.normal, hit.matColor.xyz, hit.kd, hit.ks);
-	//vec3 BRDF = diffColor / M_PI;
-
 	vec3 weight = vec3(cos_theta / p);
 
 
@@ -248,6 +244,7 @@ void main() {
 
 		if (hit.mat == 3)
 		{
+			// Specular BRDF - one incoming direction & one outgoing direction, that is, the perfect reflection direction.
 			SpecularBRDF(hit);
 		}
 		else //if (hit.mat == 0)

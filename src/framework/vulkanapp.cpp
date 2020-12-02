@@ -286,7 +286,8 @@ bool VulkanApp::InitializeDevicesAndQueues() {
         deviceExtensions.push_back(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
         deviceExtensions.push_back(VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME);
         deviceExtensions.push_back(VK_KHR_RAY_TRACING_EXTENSION_NAME);
-
+		deviceExtensions.push_back(VK_KHR_SHADER_CLOCK_EXTENSION_NAME);
+		
         // VK_KHR_ray_tracing requires VK_EXT_descriptor_indexing extension so we make sure it's enabled as well
         if (!mSettings.supportDescriptorIndexing) {
             mSettings.supportDescriptorIndexing = true;
