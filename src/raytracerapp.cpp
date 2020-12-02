@@ -94,7 +94,7 @@ void RayTracerApp::updateUniformParams(const float deltaTime,int frameNumber) {
 	params->clearColor = backgroundColor;
 	params->LightPos = mLight.getLightPos();
 	params->LightInfo = vec4(lightType, mLight.ShadowAttenuation, 0,0);
-	params->modeFrame= vec4(mode, frameNumber,0.0,0.0);
+	params->modeFrame= vec4(mode, deltaTime,0.0,0.0);
 	mUniformParamsBuffer.Unmap();
 }
 void RayTracerApp::FreeResources() {
@@ -318,7 +318,7 @@ bool RayTracerApp::CreateAS(const VkAccelerationStructureTypeKHR type,
 void RayTracerApp::LoadSceneGeometry() {
 
 	mScene.meshes.clear(); 
-	LoadObj(sScenesFolder + "test.obj");
+	LoadObj(sScenesFolder + "test.obj");//
 	//LoadObj(sScenesFolder + "test2.obj");
 	// prepare shader resources infos
 	const size_t numMeshes = mScene.meshes.size();
@@ -445,7 +445,7 @@ void RayTracerApp::LoadObj(String fileName) {
 				matInfo.z = 0.0;
 				matInfo.w = 0.0;
 			}
-			else if (shape.name == "Mirror1"|| shape.name == "Mirror2")
+			else if (shape.name == "Mirror")
 			{
 				colorInfo.x = 1.0;
 				colorInfo.y = 1.0;

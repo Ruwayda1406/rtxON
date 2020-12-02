@@ -60,3 +60,26 @@ void createCoordinateSystem(in vec3 N, out vec3 Nt, out vec3 Nb)
 		Nt = vec3(0, -N.z, N.y) / sqrt(N.y * N.y + N.z * N.z);
 	Nb = cross(N, Nt);
 }
+//---------------------------------------------------------
+vec3 reflection(vec3 I, vec3 N)
+{
+	return I - 2.0 * dot(I, N) * N;
+}
+
+vec3 computeDiffuse(vec3 lightDir, vec3 normal, vec3 kd, vec3 ambient)
+{
+	// Lambertian
+	float NdotL = max(dot(normal, lightDir), 0.0);
+	//float NdotL = clamp(dot(normal, lightDir), 0.0, 1.0); // In range [0..1]
+	return (ambient + (kd * NdotL));
+}
+
+vec3 computeSpecular(vec3 viewDir, vec3 lightDir, vec3 normal, vec3 ks, float shininess)
+{
+	// Compute specular only if not in shadow
+	vec3        V = normalize(-viewDir);
+	vec3        R = reflect(-lightDir, normal);
+	float	VdotR = max(dot(V, R), 0.0);// clamp(dot(V, R), 0.0, 1.0); // In range [0..1]
+	float       specular = pow(VdotR, shininess);
+	return vec3(ks * specular);
+}

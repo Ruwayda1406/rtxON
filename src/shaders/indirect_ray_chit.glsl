@@ -28,9 +28,11 @@ layout(set = SWS_UNIFORMPARAMS_SET, binding = SWS_UNIFORMPARAMS_BINDING, std140)
 };
 
 layout(location = SWS_LOC_INDIRECT_RAY) rayPayloadInEXT IndirectRayPayload indirectRay;
-//layout(location = SWS_LOC_INDIRECT_RAY2) rayPayloadInEXT IndirectRayPayload indirectRay2;
+layout(location = SWS_LOC_SHADOW_RAY)  rayPayloadEXT ShadowRayPayload ShadowRay;
 
 hitAttributeEXT vec2 HitAttribs;
+
+
 ShadingData getHitShadingData(uint objId)
 {
 	ShadingData closestHit;
@@ -45,18 +47,99 @@ ShadingData getHitShadingData(uint objId)
 
 	// Computing the normal at hit position
 	closestHit.normal = normalize(BaryLerp(v0.normal.xyz, v1.normal.xyz, v2.normal.xyz, barycentrics));
-	//const vec2 uv = BaryLerp(v0.uv.xy, v1.uv.xy, v2.uv.xy, barycentrics);
-	//closestHit.difColor = PrimaryRay.accColor.xyzw;
+	closestHit.pos = gl_WorldRayOriginEXT + gl_WorldRayDirectionEXT * gl_HitTEXT;
 	closestHit.matColor = meshInfoArray[objId].info[0];
 
 	closestHit.kd = meshInfoArray[objId].info[1].x;
 	closestHit.ks = meshInfoArray[objId].info[1].y;
 	closestHit.mat = int(meshInfoArray[objId].info[1].z);
-	closestHit.emittance = vec3(meshInfoArray[objId].info[1].w);//just for now
+	closestHit.emittance = vec3(meshInfoArray[objId].info[1].w);
 
-	closestHit.pos = gl_WorldRayOriginEXT + gl_WorldRayDirectionEXT * gl_HitTEXT;
+
+
 
 	return closestHit;
+}
+bool shootShadowRay(vec3 shadowRayOrigin, vec3 dirToLight, float min, float distToLight)
+{
+	const uint shadowRayFlags = gl_RayFlagsNoOpaqueEXT | gl_RayFlagsSkipClosestHitShaderEXT;
+	const uint cullMask = 0xFF;
+	const uint stbRecordStride = 1;
+	const float tmin = min;
+	const float tmax = distToLight;
+	ShadowRay.isShadowed = true;
+	traceRayEXT(Scene,
+		shadowRayFlags,
+		cullMask,
+		SWS_SHADOW_HIT_SHADERS_IDX,
+		stbRecordStride,
+		SWS_SHADOW_MISS_SHADERS_IDX,
+		shadowRayOrigin,
+		0.0f,
+		dirToLight,
+		tmax,
+		SWS_LOC_SHADOW_RAY);
+	return ShadowRay.isShadowed;
+
+}
+vec3 DiffuseShade(vec3 HitPosition, vec3 HitNormal, vec3 HitMatColor, float kd, float ks)
+{
+
+	// Get information about this light; access your framework’s scene structs
+	int LightType = int(Params.LightInfo.x);
+	vec3 hitValues = vec3(0);
+	float r1 = nextRand(indirectRay.rndSeed);
+	float r2 = nextRand(indirectRay.rndSeed);
+	float r3 = nextRand(indirectRay.rndSeed);
+
+	vec3 lightPos = Params.LightPos.xyz + vec3(r1, r2, r3);
+	vec3 dirToLight;
+	float distToLight, lightIntensity;
+	if (LightType == 0)// Point light
+	{
+		dirToLight = normalize(lightPos - HitPosition);
+		distToLight = length(lightPos - HitPosition);
+		lightIntensity = Params.LightPos.w / (distToLight * distToLight);
+	}
+	else  // Directional light
+	{
+		dirToLight = normalize(lightPos - vec3(0));
+		distToLight = length(lightPos - vec3(0));
+		//distToLight = 10000;
+		lightIntensity = Params.LightPos.w;
+	}
+	//====================================================================
+	// Diffuse
+	vec3 diffuse = computeDiffuse(dirToLight, HitNormal, vec3(kd), HitMatColor);
+
+	// Tracing shadow ray only if the light is visible from the surface
+	vec3  specular = vec3(0);
+	float attenuation = 1;
+	float rayColor = 0.0;
+	float LdotN = dot(HitNormal, dirToLight);
+	if (LdotN > 0.0)
+	{
+
+
+		const vec3 shadowRayOrigin = HitPosition + HitNormal * 0.001f;
+
+		ShadowRay.attenuation = attenuation;
+		bool isShadowed = shootShadowRay(shadowRayOrigin, dirToLight, 0.001, distToLight);
+		attenuation = ShadowRay.attenuation;
+
+		if (isShadowed)
+		{
+			specular = vec3(0);
+		}
+		else
+		{
+			specular = computeSpecular(gl_WorldRayDirectionEXT, dirToLight, HitNormal, vec3(ks), 100.0);
+		}
+	}
+
+	hitValues += vec3(attenuation * lightIntensity * (diffuse + specular));
+
+	return hitValues;
 }
 vec3 shootRay(vec3 rayOrigin, vec3 rayDirection, int depth)
 {
@@ -65,7 +148,7 @@ vec3 shootRay(vec3 rayOrigin, vec3 rayDirection, int depth)
 	const uint cullMask = 0xFF;
 	const uint stbRecordStride = 1;
 	const float tmin = 0.001;
-	const float tmax = 100000000.0;
+	const float tmax = 100000.0;
 	indirectRay.rayDepth = depth;
 	traceRayEXT(Scene,
 		rayFlags,
@@ -82,22 +165,28 @@ vec3 shootRay(vec3 rayOrigin, vec3 rayDirection, int depth)
 	return indirectRay.hitValue;
 
 }
-void DiffuseBRDF(vec3 rayOrigin, ShadingData hit)
+void DiffuseBRDF(ShadingData hit)
 {
+	if (hit.emittance.x == 1.0)
+	{
+		indirectRay.hitValue = hit.emittance;
+		return;
+	}
 	//https://en.wikipedia.org/wiki/Path_tracing
-		//https://www.scratchapixel.com/lessons/3d-basic-rendering/global-illumination-path-tracing/global-illumination-path-tracing-practical-implementation
-		//vec3 directLightContrib = DiffuseShade(hit.pos, hit.normal, hit.matColor.xyz, hit.kd, hit.ks);
-		// Pick a random direction from here and keep going.
+	// Pick a random direction from here and keep going.
 	vec3 tangent, bitangent;
 	createCoordinateSystem(hit.normal, tangent, bitangent);
 	//the newRay Direction
+	vec3 rayOrigin = hit.pos;
 	vec3 rayDirection = samplingHemisphere(indirectRay.rndSeed, tangent, bitangent, hit.normal);
 
-	// Probability of the newRay (cosine distributed)
-	const float p = 1.0 / (2.0*M_PI);
-	// Compute the BRDF for this ray (assuming Lambertian reflection)
-	vec3 BRDF = hit.matColor.xyz / M_PI; 
 	float cos_theta = dot(rayDirection, hit.normal);
+	// Probability of the newRay (cosine distributed)
+	const float p = 1 / M_PI;
+	// Compute the BRDF for this ray (assuming Lambertian reflection)
+	vec3 diffColor= DiffuseShade(hit.pos, hit.normal, hit.matColor.xyz, hit.kd, hit.ks);
+	vec3 BRDF = diffColor / M_PI;
+
 	vec3 weight = (BRDF * cos_theta / p);
 
 
@@ -106,14 +195,44 @@ void DiffuseBRDF(vec3 rayOrigin, ShadingData hit)
 	indirectRay.weight = weight;
 	indirectRay.hitValue = hit.emittance;
 
-	vec3 incoming = hit.emittance;
+	vec3 reflected = vec3(0);
 	// Recursively trace reflected light sources.
 	if (indirectRay.rayDepth < MAX_PATH_DEPTH)
 	{	
-		incoming = shootRay(indirectRay.rayOrigin, indirectRay.rayDir, indirectRay.rayDepth+1);
+		reflected = shootRay(indirectRay.rayOrigin, indirectRay.rayDir, indirectRay.rayDepth+1);
 	}
 	// Apply the Rendering Equation here.
-	indirectRay.hitValue = hit.emittance + (incoming * weight);
+	indirectRay.hitValue = hit.emittance + (reflected * weight);
+}
+void SpecularBRDF(ShadingData hit)
+{
+	//the newRay Direction
+	vec3 rayOrigin = hit.pos;
+	vec3 rayDirection = reflection(gl_WorldRayDirectionEXT, hit.normal);
+
+	float cos_theta = dot(rayDirection, hit.normal);
+	// Probability of the newRay (cosine distributed)
+	const float p = 1 / M_PI;
+	// Compute the BRDF for this ray (assuming Lambertian reflection)
+	//vec3 diffColor = DiffuseShade(hit.pos, hit.normal, hit.matColor.xyz, hit.kd, hit.ks);
+	//vec3 BRDF = diffColor / M_PI;
+
+	vec3 weight = vec3(cos_theta / p);
+
+
+	indirectRay.rayOrigin = rayOrigin;
+	indirectRay.rayDir = rayDirection;
+	indirectRay.weight = weight;
+	indirectRay.hitValue = hit.emittance;
+
+	vec3 reflected = vec3(0);
+	// Recursively trace reflected light sources.
+	if (indirectRay.rayDepth < MAX_PATH_DEPTH)
+	{
+		reflected = shootRay(indirectRay.rayOrigin, indirectRay.rayDir, indirectRay.rayDepth + 1);
+	}
+	// Apply the Rendering Equation here.
+	indirectRay.hitValue = hit.emittance + (reflected * weight);
 }
 void main() {
 	indirectRay.isMiss = false;
@@ -126,14 +245,15 @@ void main() {
 		// Russian roulette: starting at depth MAX_PATH_DEPTH, each recursive step will stop with a probability of 0.1
 		const uint objId = gl_InstanceCustomIndexEXT;
 		ShadingData hit = getHitShadingData(objId);
-		vec3 rayOrigin = hit.pos;
-		// Add the emission, the L_e(x,w) part of the rendering equation, but scale it with the Russian Roulette
-	    // probability weight.
 
-		//if (hit.mat == 0)
+		if (hit.mat == 3)
+		{
+			SpecularBRDF(hit);
+		}
+		else //if (hit.mat == 0)
 		{
 			// Diffuse BRDF - choose an outgoing direction with hemisphere sampling.
-			DiffuseBRDF(rayOrigin,hit);
+			DiffuseBRDF(hit);
 		}
 		
 		

@@ -33,23 +33,6 @@ layout(location = SWS_LOC_SHADOW_RAY)  rayPayloadEXT ShadowRayPayload ShadowRay;
 hitAttributeEXT vec2 HitAttribs;
 
 
-vec3 computeDiffuse(vec3 lightDir, vec3 normal, vec3 kd, vec3 ambient)
-{
-	// Lambertian
-	float NdotL = max(dot(normal, lightDir), 0.0);
-	//float NdotL = clamp(dot(normal, lightDir), 0.0, 1.0); // In range [0..1]
-	return (ambient + (kd * NdotL));
-}
-
-vec3 computeSpecular(vec3 viewDir, vec3 lightDir, vec3 normal, vec3 ks, float shininess)
-{
-	// Compute specular only if not in shadow
-	vec3        V = normalize(-viewDir);
-	vec3        R = reflect(-lightDir, normal);
-	float	VdotR = max(dot(V, R), 0.0);// clamp(dot(V, R), 0.0, 1.0); // In range [0..1]
-	float       specular = pow(VdotR, shininess);
-	return vec3(ks * specular);
-}
 ShadingData getHitShadingData(uint objId)
 {
 	ShadingData closestHit;
@@ -163,34 +146,6 @@ vec3 DiffuseShade(vec3 HitPosition, vec3 HitNormal, vec3 HitMatColor, float kd, 
 	vec3 finalcolor = hitValues / float(MAX_LIGHTS);
 	return finalcolor;
 }
-vec3 getRefractionNormal(vec3 I, vec3 N)
-{
-	//https://www.scratchapixel.com/lessons/3d-basic-rendering/introduction-to-shading/reflection-refraction-fresnel
-	float cosi = clamp(-1, 1, dot(I, N));//NdotD
-
-	vec3 refrNormal;
-	if (cosi < 0)
-	{
-		refrNormal = N;
-	}
-	else {
-		refrNormal = -N;
-	}
-	return refrNormal;
-}
-float getRefractionEta(vec3 I, vec3 N, float k)//ior=index of refraction 
-{
-	float cosi = clamp(-1, 1, dot(I, N));
-	float refrEta;
-	if (cosi < 0)
-	{
-		refrEta = k;
-	}
-	else { 
-		refrEta = 1.0/k;
-	}
-	return refrEta;
-}
 void main() {
 
 	PrimaryRay.isMiss = false;
@@ -202,39 +157,10 @@ void main() {
 	if (hit.mat == 3)// Reflection
 	{
 		vec3 origin = hit.pos;
-		vec3 rayDir = reflect(gl_WorldRayDirectionEXT, hit.normal);
+		vec3 rayDir = reflection(gl_WorldRayDirectionEXT, hit.normal);
 		PrimaryRay.attenuation *= hit.ks;
 		PrimaryRay.done = false;
 		PrimaryRay.rayOrigin = origin;
 		PrimaryRay.rayDir = rayDir;
 	}
-	else if (hit.mat == 2)
-	{
-		float k_glass = 1.5;
-		float NdotD = dot(hit.normal, gl_WorldRayDirectionEXT);
-		float cosi = clamp(-1, 1, NdotD);
-
-		vec3 refrNormal = getRefractionNormal(gl_WorldRayDirectionEXT, hit.normal);
-		float refrEta = getRefractionEta(gl_WorldRayDirectionEXT, hit.normal, k_glass);
-
-		vec3 origin = hit.pos;
-		vec3 rayDir = refract(gl_WorldRayDirectionEXT, refrNormal, refrEta);
-		PrimaryRay.done = false;
-		PrimaryRay.rayOrigin = origin;
-		PrimaryRay.rayDir = rayDir;
-	}
 }
-/*
-vec3 reflection(vec3 I, vec3 N)
-{
-	return I - 2.0 * dot(I, N) * N;
-}
-
-
-vec3 refract(vec3 I, vec3 N, float eta)
-{
-	float cosi=dot(N, I);
-    float k = 1 - eta * eta * (1 - cosi * cosi);
-	return k < 0 ? 0 : eta * I + (eta * cosi - sqrtf(k)) * n;
-}
-*/
