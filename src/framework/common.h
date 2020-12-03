@@ -60,7 +60,6 @@ glm::vec3 inline getRandomVec3(float min, float max)
 }
 float inline getRandomFloat(float min, float max)
 {
-	//srand(time(NULL));
 	float r = min + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (max - min)));
 	return r;
 }

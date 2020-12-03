@@ -113,6 +113,7 @@ vec3 pathtracerLoop(vec3 origin,vec3 direction,uint rndSeed)
 	vec3 hitValues = vec3(0);
 
 	indirectRay.rndSeed = rndSeed;
+	// Define some colors.
 	for (int p = 0; p < MAX_PATH_TRACED; p++)
 	{
 		indirectRay.rayOrigin = origin.xyz;
@@ -121,7 +122,7 @@ vec3 pathtracerLoop(vec3 origin,vec3 direction,uint rndSeed)
 		indirectRay.rayDepth = 0;
 		indirectRay.hitValue = vec3(0);
 		vec3 curWeight = vec3(1);
-		for (; indirectRay.rayDepth < MAX_PATH_DEPTH; indirectRay.rayDepth++)
+	//	for (; indirectRay.rayDepth < MAX_PATH_DEPTH; indirectRay.rayDepth++)
 		{
 
 			traceRayEXT(Scene,

@@ -31,7 +31,7 @@ RayTracerApp::RayTracerApp()
 	, mUpKeyDown(false)
 {
 	startTime= floor(glfwGetTime()*100);
-
+	srand(time(NULL));
 }
 RayTracerApp::~RayTracerApp() {
 
@@ -538,9 +538,9 @@ void RayTracerApp::LoadObj(String fileName) {
 				else
 				{
 
-					colorInfo.x = getRandomFloat(0.5, 1.0);
-					colorInfo.y = getRandomFloat(0.5, 1.0);
-					colorInfo.z = getRandomFloat(0.5, 1.0);
+					colorInfo.x = getRandomFloat(0.1, 1.0);
+					colorInfo.y = getRandomFloat(0.1, 1.0);
+					colorInfo.z = getRandomFloat(0.1, 1.0);
 
 				}
 
