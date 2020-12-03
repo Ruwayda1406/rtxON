@@ -136,8 +136,8 @@ vec3 pathtracerLoop(vec3 origin,vec3 direction,uint rndSeed)
 				tmax,
 				SWS_LOC_INDIRECT_RAY);
 
-			hitValues += indirectRay.hitValue *curWeight;
-			curWeight *= indirectRay.weight;
+			hitValues += indirectRay.hitValue;// *curWeight;
+			//curWeight *= indirectRay.weight;
 		}
 
 	}

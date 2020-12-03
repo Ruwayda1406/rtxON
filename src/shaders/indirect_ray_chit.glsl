@@ -181,8 +181,9 @@ vec3 shootRay(vec3 rayOrigin, vec3 rayDirection, int depth)
 	return indirectRay.hitValue;
 
 }
-void DiffuseBRDF(ShadingData hit)
+void DiffuseBRDF(ShadingData hit, float rrFactor)
 {
+
 	//https://en.wikipedia.org/wiki/Path_tracing
 	// Pick a random direction from here and keep going.
 	vec3 tangent, bitangent;
@@ -195,8 +196,8 @@ void DiffuseBRDF(ShadingData hit)
 	// Probability of the newRay (cosine distributed)
 	const float p = 1 / M_PI;
 	// Compute the BRDF for this ray (assuming Lambertian reflection)
-	vec3 diffColor= DiffuseShade(hit.pos, hit.normal, hit.matColor.xyz, hit.kd, hit.ks);
-	vec3 BRDF = diffColor / M_PI;
+	//vec3 diffColor= DiffuseShade(hit.pos, hit.normal, hit.matColor.xyz, hit.kd, hit.ks);
+	vec3 BRDF = hit.matColor.xyz / M_PI;
 
 	vec3 weight = (BRDF * cos_theta / p);
 
@@ -204,10 +205,10 @@ void DiffuseBRDF(ShadingData hit)
 	indirectRay.rayOrigin = rayOrigin;
 	indirectRay.rayDir = rayDirection;
 	indirectRay.weight = weight;
-	indirectRay.hitValue = hit.emittance;
+	indirectRay.hitValue = hit.emittance*rrFactor;
 	if (hit.emittance.x == 1.0)
 	{
-		indirectRay.hitValue = hit.emittance;
+		indirectRay.hitValue = hit.emittance*rrFactor;
 		return;
 	}
 
@@ -218,9 +219,9 @@ void DiffuseBRDF(ShadingData hit)
 		reflected = shootRay(indirectRay.rayOrigin, indirectRay.rayDir, indirectRay.rayDepth+1);
 	}
 	// Apply the Rendering Equation here.
-	indirectRay.hitValue = hit.emittance + (reflected *weight);
+	indirectRay.hitValue = (hit.emittance + (reflected * weight))*rrFactor;
 }
-void SpecularBRDF(ShadingData hit)
+void SpecularBRDF(ShadingData hit, float rrFactor)
 {
 	//the newRay Direction
 	vec3 rayOrigin = hit.pos;
@@ -235,7 +236,7 @@ void SpecularBRDF(ShadingData hit)
 	indirectRay.rayOrigin = rayOrigin;
 	indirectRay.rayDir = rayDirection;
 	indirectRay.weight = weight;
-	indirectRay.hitValue = hit.emittance;
+	indirectRay.hitValue = hit.emittance*rrFactor;
 
 	vec3 reflected = vec3(0);
 	// Recursively trace reflected light sources.
@@ -244,7 +245,7 @@ void SpecularBRDF(ShadingData hit)
 		reflected = shootRay(indirectRay.rayOrigin, indirectRay.rayDir, indirectRay.rayDepth + 1);
 	}
 	// Apply the Rendering Equation here.
-	indirectRay.hitValue = hit.emittance + (reflected * weight);
+	indirectRay.hitValue = (hit.emittance + (reflected * weight))*rrFactor;
 }
 void main() {
 	indirectRay.isMiss = false;
@@ -254,19 +255,29 @@ void main() {
 	}
 	else
 	{
-		// Russian roulette: starting at depth MAX_PATH_DEPTH, each recursive step will stop with a probability of 0.1
 		const uint objId = gl_InstanceCustomIndexEXT;
 		ShadingData hit = getHitShadingData(objId);
 
+		// Russian roulette: starting at depth 5, each recursive step will stop with a probability of 0.1
+		float rrFactor = 1.0;
+		if (indirectRay.rayDepth > MAX_PATH_DEPTH / 2.0) {
+			const float rrStopProbability = 0.1;
+			uint seed = indirectRay.rndSeed;
+			float r = nextRand(seed);
+			if (r <= rrStopProbability) {
+				return;
+			}
+			rrFactor = 1.0 / (1.0 - rrStopProbability);
+		}
 		if (hit.mat == 3)
 		{
 			// Specular BRDF - one incoming direction & one outgoing direction, that is, the perfect reflection direction.
-			SpecularBRDF(hit);
+			SpecularBRDF(hit, rrFactor);
 		}
 		else //if (hit.mat == 0)
 		{
 			// Diffuse BRDF - choose an outgoing direction with hemisphere sampling.
-			DiffuseBRDF(hit);
+			DiffuseBRDF(hit, rrFactor);
 		}
 		
 		
