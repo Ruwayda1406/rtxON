@@ -15,6 +15,10 @@ layout(set = SWS_FACES_SET, binding = 0, std430) readonly buffer FacesBuffer {
 	uvec4 Faces[];
 } FacesArray[];
 
+layout(set = SWS_LIGHTS_SET, binding = 0, std430) readonly buffer lightsBuffer {
+	LightTriangle lightTriangles[];
+};
+
 layout(set = SWS_MESHINFO_SET, binding = 0, std430) readonly buffer meshInfoBuffer {
 	vec4 info[];
 } meshInfoArray[];
@@ -82,6 +86,21 @@ bool shootShadowRay(vec3 shadowRayOrigin, vec3 dirToLight, float min, float dist
 	return ShadowRay.isShadowed;
 
 }
+vec3 getLightPos(int LightType,inout uint seed)
+{
+	if (LightType == 0)//random
+	{
+		int nLightTriangles = int(Params.LightInfo.z);
+		float r0 = nextRand(seed)*nLightTriangles;
+		int randomTriangleIdx = int(clamp(r0, 0, nLightTriangles));
+		LightTriangle lightT = lightTriangles[randomTriangleIdx];
+		return randomPointInTriangle(seed, lightT.v0, lightT.v1, lightT.v2);
+	}
+	else
+	{
+		return lightTriangles[0].v0;
+	}
+}
 vec3 DiffuseShade(vec3 HitPosition, vec3 HitNormal, vec3 HitMatColor, float kd, float ks)
 {
 	// Get information about this light; access your framework’s scene structs
@@ -91,25 +110,21 @@ vec3 DiffuseShade(vec3 HitPosition, vec3 HitNormal, vec3 HitMatColor, float kd, 
 
 	for (int j = 0; j < MAX_LIGHTS; j++)//SoftShadows
 	{
-		float r1 = nextRand(PrimaryRay.rndSeed);
-		float r2 = nextRand(PrimaryRay.rndSeed);
-		float r3 = nextRand(PrimaryRay.rndSeed);
-
-		vec3 lightPos = Params.LightPos.xyz + vec3(r1, r2,r3);
+		vec3 lightPos = getLightPos(LightType,PrimaryRay.rndSeed);//Params.LightPos.xyz + vec3(r1, r2,r3);
 		vec3 dirToLight;
-		float distToLight, lightIntensity;
-		if (LightType == 0)// Point light
+		float distToLight;
+		float lightIntensity = Params.LightInfo.w;
+		//if (LightType == 0)// Point light
 		{
 			dirToLight = normalize(lightPos - HitPosition);
 			distToLight = length(lightPos - HitPosition);
-			lightIntensity = Params.LightPos.w / (distToLight * distToLight);
+			//lightIntensity = lightIntensity / (distToLight * distToLight);
 		}
-		else  // Directional light
+		//else  // Directional light
 		{
-			dirToLight = normalize(lightPos - vec3(0)); 
-			distToLight = length(lightPos - vec3(0));
+			//dirToLight = normalize(-lightPos); 
+			//distToLight = length(-lightPos);
 			//distToLight = 10000;
-			lightIntensity = Params.LightPos.w;
 		}
 		//====================================================================
 		// Diffuse

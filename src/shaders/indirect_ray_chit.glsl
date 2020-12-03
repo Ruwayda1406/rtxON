@@ -15,6 +15,10 @@ layout(set = SWS_FACES_SET, binding = 0, std430) readonly buffer FacesBuffer {
 	uvec4 Faces[];
 } FacesArray[];
 
+layout(set = SWS_LIGHTS_SET, binding = 0, std430) readonly buffer lightsBuffer {
+	LightTriangle lightTriangles[];
+};
+
 layout(set = SWS_MESHINFO_SET, binding = 0, std430) readonly buffer meshInfoBuffer {
 	vec4 info[];
 } meshInfoArray[];
@@ -82,31 +86,43 @@ bool shootShadowRay(vec3 shadowRayOrigin, vec3 dirToLight, float min, float dist
 	return ShadowRay.isShadowed;
 
 }
+vec3 getLightPos(int LightType, inout uint seed)
+{
+	if (LightType == 0)//random
+	{
+		int nLightTriangles = int(Params.LightInfo.z);
+		float r0 = nextRand(seed)*nLightTriangles;
+		int randomTriangleIdx = int(clamp(r0, 0, nLightTriangles));
+		LightTriangle lightT = lightTriangles[randomTriangleIdx];
+		return randomPointInTriangle(seed, lightT.v0, lightT.v1, lightT.v2);
+	}
+	else
+	{
+		return lightTriangles[0].v0;
+	}
+}
 vec3 DiffuseShade(vec3 HitPosition, vec3 HitNormal, vec3 HitMatColor, float kd, float ks)
 {
 
 	// Get information about this light; access your framework’s scene structs
 	int LightType = int(Params.LightInfo.x);
 	vec3 hitValues = vec3(0);
-	float r1 = nextRand(indirectRay.rndSeed);
-	float r2 = nextRand(indirectRay.rndSeed);
-	float r3 = nextRand(indirectRay.rndSeed);
 
-	vec3 lightPos = Params.LightPos.xyz + vec3(r1, r2, r3);
+	vec3 lightPos = getLightPos(LightType, indirectRay.rndSeed);//Params.LightPos.xyz + vec3(r1, r2, r3);
+	float lightIntensity = Params.LightInfo.w;
 	vec3 dirToLight;
-	float distToLight, lightIntensity;
-	if (LightType == 0)// Point light
+	float distToLight;
+	//if (LightType == 0)// Point light
 	{
-		dirToLight = normalize(lightPos - HitPosition);
-		distToLight = length(lightPos - HitPosition);
-		lightIntensity = Params.LightPos.w / (distToLight * distToLight);
+	//	dirToLight = normalize(lightPos - HitPosition);
+	//	distToLight = length(lightPos - HitPosition);
+	//	lightIntensity = lightIntensity / (distToLight * distToLight);
 	}
-	else  // Directional light
+	//else  // Directional light
 	{
 		dirToLight = normalize(lightPos - vec3(0));
 		distToLight = length(lightPos - vec3(0));
-		//distToLight = 10000;
-		lightIntensity = Params.LightPos.w;
+	//	distToLight = 10000;
 	}
 	//====================================================================
 	// Diffuse
@@ -146,9 +162,9 @@ vec3 shootRay(vec3 rayOrigin, vec3 rayDirection, int depth)
 
 	const uint rayFlags = gl_RayFlagsOpaqueEXT;
 	const uint cullMask = 0xFF;
-	const uint stbRecordStride = 1;
+	const uint stbRecordStride = 0;
 	const float tmin = 0.001;
-	const float tmax = 100000.0;
+	const float tmax = 100000000.0;;
 	indirectRay.rayDepth = depth;
 	traceRayEXT(Scene,
 		rayFlags,
@@ -167,11 +183,11 @@ vec3 shootRay(vec3 rayOrigin, vec3 rayDirection, int depth)
 }
 void DiffuseBRDF(ShadingData hit)
 {
-	if (hit.emittance.x == 1.0)
-	{
-		indirectRay.hitValue = hit.emittance;
-		return;
-	}
+	//if (hit.emittance.x ==1.0)
+	//{
+	//	indirectRay.hitValue = hit.emittance;
+	//	return;
+	//}
 	//https://en.wikipedia.org/wiki/Path_tracing
 	// Pick a random direction from here and keep going.
 	vec3 tangent, bitangent;
@@ -194,6 +210,7 @@ void DiffuseBRDF(ShadingData hit)
 	indirectRay.rayDir = rayDirection;
 	indirectRay.weight = weight;
 	indirectRay.hitValue = hit.emittance;
+
 
 	vec3 reflected = vec3(0);
 	// Recursively trace reflected light sources.

@@ -101,21 +101,21 @@ vec3 raytracer(uint rndSeed)
 	}
 	return ( hitValues / float(MAX_ANTIALIASING_ITER));
 }
-vec3 pathtracerLoop(vec3 origin,vec3 direction)
+vec3 pathtracerLoop(vec3 origin,vec3 direction,uint rndSeed)
 {
 	////////////////// path tracing ////////////////////////
 	const uint rayFlags = gl_RayFlagsOpaqueEXT;// gl_RayFlagsNoneEXT; 
 
 	const uint cullMask = 0xFF;
-	const uint stbRecordStride = 1;
+	const uint stbRecordStride = 0;
 	const float tmin = 0.001;
-	const float tmax = 1000.0;
+	const float tmax = 10000.0;
 	vec3 hitValues = vec3(0);
 	for (int p = 0; p < MAX_PATH_TRACED; p++)
 	{
-
-		vec3 rayOrigin = origin.xyz;
-		vec3 rayDirection = direction.xyz;
+		indirectRay.rndSeed = rndSeed;
+		indirectRay.rayOrigin = origin.xyz;
+		indirectRay.rayDir = direction.xyz;
 		indirectRay.weight = vec3(0);
 		indirectRay.rayDepth = 0;
 		indirectRay.hitValue = vec3(0);
@@ -129,23 +129,38 @@ vec3 pathtracerLoop(vec3 origin,vec3 direction)
 				SWS_INDIRECT_HIT_SHADERS_IDX,
 				stbRecordStride,
 				SWS_INDIRECT_MISS_SHADERS_IDX,
-				rayOrigin,
+				indirectRay.rayOrigin,
 				tmin,
-				rayDirection,
+				indirectRay.rayDir,
 				tmax,
 				SWS_LOC_INDIRECT_RAY);
 
 			hitValues += indirectRay.hitValue *curWeight;
 			curWeight *= indirectRay.weight;
-			rayOrigin = indirectRay.rayOrigin;
-			rayDirection = indirectRay.rayDir;
 		}
 
 	}
 
-	return (hitValues / float(MAX_PATH_TRACED));
+	return hitValues/ float(MAX_PATH_TRACED);
 }
 vec3 pathtracer(uint rndSeed)
+{
+	vec3 hitValues = vec3(0);
+
+	const vec2 uv = vec2(gl_LaunchIDEXT.xy);
+	const vec2 pixel = uv / (gl_LaunchSizeEXT.xy - 1.0);
+	const float aspect = float(gl_LaunchSizeEXT.x) / float(gl_LaunchSizeEXT.y);
+
+
+	// Initialize a ray structure for our ray tracer
+	vec3 origin = Camera.pos.xyz;
+	vec3 direction = CalcRayDir(pixel, aspect);
+
+
+	hitValues += pathtracerLoop(origin, direction, rndSeed);
+	return hitValues;
+}
+vec3 pathtracer_antialiasing(uint rndSeed)
 {
 	// monte carlo antialiasing
 	vec3 hitValues = vec3(0);
@@ -164,40 +179,40 @@ vec3 pathtracer(uint rndSeed)
 		vec3 origin = Camera.pos.xyz;
 		vec3 direction = CalcRayDir(pixel, aspect);
 
-		indirectRay.rndSeed = rndSeed;
-		hitValues += pathtracerLoop(origin, direction);
+		hitValues += pathtracerLoop(origin, direction, rndSeed);
 		rndSeed = indirectRay.rndSeed;
 
 	}
 	return (hitValues / float(MAX_ANTIALIASING_ITER));
+	return hitValues;
 }
 void main() {
 	int mode = int(Params.modeFrame.x);
-	float deltaTime = Params.modeFrame.y;
+	float frameCount = Params.modeFrame.y;
 	// Initialize the random number
-	uint rndSeed = tea(gl_LaunchIDEXT.y * gl_LaunchSizeEXT.x + gl_LaunchIDEXT.x, int(clockARB()));
-
-
 	vec3 color = vec3(0.3);
-
-
+	float alpha = 0.0;
 	if (mode == 1)
 	{
+		uint rndSeed = tea(gl_LaunchIDEXT.y * gl_LaunchSizeEXT.x + gl_LaunchIDEXT.x, int(frameCount));
 		color = raytracer(rndSeed);
+		alpha = 0.1;
+
 	}
 	else if (mode == 2)
 	{
+		uint rndSeed = tea(gl_LaunchIDEXT.y * gl_LaunchSizeEXT.x + gl_LaunchIDEXT.x, int(clockARB()));
 		color = pathtracer(rndSeed);
+		alpha = 1.0;
 	}
 
 	// Do accumulation over time
-	if (deltaTime > 0)
+	//if (frameCount > 0)
 	{
-		float a = 1.0f / float(deltaTime + 1);
-		vec3  old_color = imageLoad(ResultImage, ivec2(gl_LaunchIDEXT.xy)).xyz;
-		imageStore(ResultImage, ivec2(gl_LaunchIDEXT.xy), vec4(mix(old_color, color, a), 1.f));
+	//	vec3  old_color = imageLoad(ResultImage, ivec2(gl_LaunchIDEXT.xy)).xyz;
+	//	imageStore(ResultImage, ivec2(gl_LaunchIDEXT.xy), vec4(mix(old_color, color, alpha), 1.f));
 	}
-	else
+	//else
 	{
 		// First frame, replace the value in the buffer
 		imageStore(ResultImage, ivec2(gl_LaunchIDEXT.xy), vec4(color, 1.f));

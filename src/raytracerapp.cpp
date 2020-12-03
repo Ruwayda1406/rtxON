@@ -11,7 +11,7 @@ static vec4 backgroundColor = vec4(0.7 , 0.8 , 1.0,1.0);
 static vec4 planeColor = vec4(0.7 , 0.8 , 0.5,1.0);
 static int mode = 1;
 static int startTime;
-static int lightType = 9;
+static int lightType = 0;
 static const float sMoveSpeed = 2.0f;
 static const float sRotateSpeed = 0.25f;
 
@@ -53,14 +53,15 @@ void RayTracerApp::InitApp() {
     this->CreateRaytracingPipelineAndSBT();
     this->UpdateDescriptorSets();
 }
-void RayTracerApp::updateUniformParams(const float deltaTime,int frameNumber) {
+void RayTracerApp::updateUniformParams(const float deltaTime) {
+	int currTime = floor(glfwGetTime() * 100);
 	// update values
-	if (mWKeyDown) {
+	/*if (mWKeyDown) {
 		mLight.move(vec3(0.01, 0, 0));
 	}
 	if (mSKeyDown) {
 		mLight.move(vec3(-0.01, 0, 0));
-	}
+	}*/
 	if (mRightKeyDown || mLeftKeyDown || mDownKeyDown || mUpKeyDown){
 		vec2 moveDelta(0.0f, 0.0f);
 		if (mUpKeyDown) {
@@ -78,7 +79,10 @@ void RayTracerApp::updateUniformParams(const float deltaTime,int frameNumber) {
 
 		moveDelta *= sMoveSpeed * deltaTime;
 		mCamera.Move(moveDelta.x, moveDelta.y);
+		startTime = currTime;
 	}
+	int frameNumber = currTime - startTime;
+
 	//////////////////////////////////////////////////////////
 	// copy camera data to gpu
 	CameraUniformParams* cameraParams = reinterpret_cast<CameraUniformParams*>(mCameraBuffer.Map());
@@ -92,9 +96,9 @@ void RayTracerApp::updateUniformParams(const float deltaTime,int frameNumber) {
 	// copy others data to gpu
 	UniformParams* params = reinterpret_cast<UniformParams*>(mUniformParamsBuffer.Map());
 	params->clearColor = backgroundColor;
-	params->LightPos = mLight.getLightPos();
-	params->LightInfo = vec4(lightType, mLight.ShadowAttenuation, 0,0);
-	params->modeFrame= vec4(mode, deltaTime,0.0,0.0);
+	//params->LightPos = mLight.getLightPos();
+	params->LightInfo = vec4(lightType, mLight.ShadowAttenuation, mLight.size,mLight.LightIntensity);
+	params->modeFrame= vec4(mode, frameNumber,0.0,0.0);
 	mUniformParamsBuffer.Unmap();
 }
 void RayTracerApp::FreeResources() {
@@ -219,6 +223,9 @@ void RayTracerApp::OnMouseMove(const float x, const float y) {
 	}
 
 	mCursorPos = newPos;
+
+	int currTime = floor(glfwGetTime() * 100);
+	startTime = currTime;
 }
 
 void RayTracerApp::OnMouseButton(const int button, const int action, const int mods) {
@@ -231,11 +238,7 @@ void RayTracerApp::OnMouseButton(const int button, const int action, const int m
 }
 
 void RayTracerApp::Update(const size_t, const float deltaTime) {
-    // Update FPS text
-	int currTime = floor(glfwGetTime()*100);
-	int frameNumber = currTime-startTime;
-    /////////////////
-	this->updateUniformParams(deltaTime, frameNumber);
+	this->updateUniformParams(deltaTime);
 }
 
 
@@ -244,7 +247,7 @@ void RayTracerApp::CreateCamera() {
 	CHECK_VK_ERROR(error, "mCameraBuffer.Create");
 
 	mCamera.SetViewport({ 0, 0, static_cast<int>(mSettings.resolutionX), static_cast<int>(mSettings.resolutionY) });
-	mCamera.SetViewPlanes(0.1f, 1000.0f);
+	mCamera.SetViewPlanes(0.1f, 100.0f);
 	mCamera.SetFovY(45.0f);
 	mCamera.LookAt(vec3(-5.0f, 3.0f, 8), vec3(-5.0f, 3.0f, 7.0f));
 
@@ -315,21 +318,62 @@ bool RayTracerApp::CreateAS(const VkAccelerationStructureTypeKHR type,
 	
     return true;
 }
+void RayTracerApp::fillLightsBuffer()
+{
+	if (mScene.lightsT.size() > 0)
+	{
+		//-------- add lights ---------------------------
+		const size_t lightsBufferInfosSize = mScene.lightsT.size() * sizeof(LightTriangle);
+		VkResult error = mScene.lights.Create(lightsBufferInfosSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_RAY_TRACING_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+		CHECK_VK_ERROR(error, "Scene.lights.Create");
+		LightTriangle* lights = reinterpret_cast<LightTriangle*>(mScene.lights.Map());
+		for (int l = 0; l < mScene.lightsT.size(); l++)
+		{
+			LightTriangle& light = lights[l];
+			light.v0 = mScene.lightsT[l].v0;
+			light.v1 = mScene.lightsT[l].v1;
+			light.v2 = mScene.lightsT[l].v2;
+		}
+		mScene.lights.Unmap();
+		mLight.size = mScene.lightsT.size();
+	}
+	else
+	{
+		//-------- add two triangles of lights ---------------------------
+		const size_t lightsBufferInfosSize = sizeof(LightTriangle);
+		VkResult error = mScene.lights.Create(lightsBufferInfosSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_RAY_TRACING_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+		CHECK_VK_ERROR(error, "Scene.lights.Create");
+		LightTriangle* lights = reinterpret_cast<LightTriangle*>(mScene.lights.Map());
+		LightTriangle& light = lights[0];
+		light.v0 = mLight.sunPos;
+		light.v1 = mLight.sunPos;
+		light.v2 = mLight.sunPos;
+		mScene.lights.Unmap();
+		mLight.size = 1;
+	}
+
+}
 void RayTracerApp::LoadSceneGeometry() {
 
 	mScene.meshes.clear(); 
-	LoadObj(sScenesFolder + "test.obj");//
+	mScene.lightsT.clear();
+	LoadObj(sScenesFolder + "test_sphereLight.obj");
+	//LoadObj(sScenesFolder + "test.obj");
+	//LoadObj(sScenesFolder + "test_planeLight.obj");///
 	//LoadObj(sScenesFolder + "test2.obj");
 	// prepare shader resources infos
+	fillLightsBuffer();
 	const size_t numMeshes = mScene.meshes.size();
 	mScene.meshInfoBufferInfos.resize(numMeshes);
 	mScene.attribsBufferInfos.resize(numMeshes);
 	mScene.facesBufferInfos.resize(numMeshes);
+
 	for (size_t i = 0; i < numMeshes; ++i) {
 		const RTMesh& mesh = mScene.meshes[i];
 		VkDescriptorBufferInfo& meshInfo = mScene.meshInfoBufferInfos[i];
 		VkDescriptorBufferInfo& attribsInfo = mScene.attribsBufferInfos[i];
 		VkDescriptorBufferInfo& facesInfo = mScene.facesBufferInfos[i];
+
 
 		attribsInfo.buffer = mesh.attribs.GetBuffer();
 		attribsInfo.offset = 0;
@@ -342,6 +386,7 @@ void RayTracerApp::LoadSceneGeometry() {
 		meshInfo.buffer = mesh.infos.GetBuffer();
 		meshInfo.offset = 0;
 		meshInfo.range = mesh.infos.GetSize();
+
 	}
 }
 void RayTracerApp::LoadObj(String fileName) {
@@ -358,7 +403,6 @@ void RayTracerApp::LoadObj(String fileName) {
 
 	const bool result = tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &error, fileName.c_str(), baseDir.c_str(), true);
 	if (result) {
-		int currentMeshNumer =0;
 		mScene.meshes.resize(shapes.size());
 
 		for (size_t shapeIdx = 0; shapeIdx < shapes.size(); ++shapeIdx) {
@@ -370,7 +414,7 @@ void RayTracerApp::LoadObj(String fileName) {
 
 			mesh.numVertices = static_cast<uint32_t>(numVertices);
 			mesh.numFaces = static_cast<uint32_t>(numFaces);
-
+			
 
 			const size_t positionsBufferSize = numVertices * sizeof(vec3);
 			const size_t indicesBufferSize = numFaces * 3 * sizeof(uint32_t);
@@ -402,6 +446,7 @@ void RayTracerApp::LoadObj(String fileName) {
 			size_t vIdx = 0;
 			for (size_t f = 0; f < numFaces; ++f) {
 				assert(shape.mesh.num_face_vertices[f] == 3);
+				Array<vec3> lightPos;
 				for (size_t j = 0; j < 3; ++j, ++vIdx) {
 					const tinyobj::index_t& i = shape.mesh.indices[vIdx];
 
@@ -417,6 +462,11 @@ void RayTracerApp::LoadObj(String fileName) {
 					normal.z = attrib.normals[3 * i.normal_index + 2];
 					uv.x = attrib.texcoords[2 * i.texcoord_index + 0];
 					uv.y = attrib.texcoords[2 * i.texcoord_index + 1];
+
+					if (shape.name == "Light")
+					{
+						lightPos.push_back(vec3(pos.x,pos.y,pos.z));
+					}
 				}
 
 				const uint32_t a = static_cast<uint32_t>(3 * f + 0);
@@ -429,6 +479,17 @@ void RayTracerApp::LoadObj(String fileName) {
 				faces[4 * f + 0] = a;
 				faces[4 * f + 1] = b;
 				faces[4 * f + 2] = c;
+
+				if (shape.name == "Light")
+				{
+					assert(lightPos.size() == 3);
+					LightTriangle lt;
+					lt.v0 = lightPos[0];
+					lt.v1 = lightPos[1];
+					lt.v2 = lightPos[2];
+					mScene.lightsT.push_back(lt);
+				}
+
 			}
 
 			vec4& colorInfo = infos[0];//random rgb color
@@ -488,7 +549,7 @@ void RayTracerApp::LoadObj(String fileName) {
 					colorInfo.x = 1;
 					colorInfo.y = 0;
 					colorInfo.z = 0;
-					colorInfo.w = 0.2;// alpha  1 == opaque; 0 == fully transparent
+					colorInfo.w = 0.4;// alpha  1 == opaque; 0 == fully transparent
 				}
 				else if (shape.name == "Sphere")
 				{
@@ -799,11 +860,13 @@ void RayTracerApp::CreateDescriptorSetsLayouts() {
 	error = vkCreateDescriptorSetLayout(mDevice, &set1LayoutInfo, nullptr, &mRTDescriptorSetsLayouts[SWS_FACES_SET]);
 	CHECK_VK_ERROR(error, L"vkCreateDescriptorSetLayout");
 
-
+	//set4
 	error = vkCreateDescriptorSetLayout(mDevice, &set1LayoutInfo, nullptr, &mRTDescriptorSetsLayouts[SWS_MESHINFO_SET]);
 	CHECK_VK_ERROR(error, L"vkCreateDescriptorSetLayout");
 
-
+	//set 5
+	error = vkCreateDescriptorSetLayout(mDevice, &set1LayoutInfo, nullptr, &mRTDescriptorSetsLayouts[SWS_LIGHTS_SET]);
+	CHECK_VK_ERROR(error, L"vkCreateDescriptorSetLayout");
 }
 
 void RayTracerApp::CreateRaytracingPipelineAndSBT() {
@@ -862,8 +925,7 @@ void RayTracerApp::UpdateDescriptorSets() {
         { VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 1 },       // top-level AS
         { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1 },                    // output image
 		 { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 2 },                   //  Camera uniform & general uniform
-	    { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, numMeshes * 3 },       // vertex attribs+faces+infos for each mesh
-																	
+	    { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, (numMeshes * 3) +1 },       // vertex attribs+faces+infos array for each mesh + one lights
 		});
 
     VkDescriptorPoolCreateInfo descriptorPoolCreateInfo;
@@ -884,6 +946,7 @@ void RayTracerApp::UpdateDescriptorSets() {
 		numMeshes,      // vertex attribs for each mesh
 		numMeshes,      // faces buffer for each mesh
 		numMeshes,      // infos buffer for each mesh
+		1,      // lights buffer for each mesh
 		});
 
 	VkDescriptorSetVariableDescriptorCountAllocateInfo variableDescriptorCountInfo;
@@ -965,8 +1028,8 @@ void RayTracerApp::UpdateDescriptorSets() {
 	facesBufferWrite.pImageInfo = nullptr;
 	facesBufferWrite.pBufferInfo = mScene.facesBufferInfos.data();
 	facesBufferWrite.pTexelBufferView = nullptr;
-
-	/////////////////////////////////////////////////////////// 
+	///////////////////////////////////////////////////////////
+ 
 	VkWriteDescriptorSet meshInfoBufferWrite;
 	meshInfoBufferWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 	meshInfoBufferWrite.pNext = nullptr;
@@ -978,7 +1041,24 @@ void RayTracerApp::UpdateDescriptorSets() {
 	meshInfoBufferWrite.pImageInfo = nullptr;
 	meshInfoBufferWrite.pBufferInfo = mScene.meshInfoBufferInfos.data();
 	meshInfoBufferWrite.pTexelBufferView = nullptr;
+	/////////////////////////////////////////////////////////// 
 
+	VkDescriptorBufferInfo lightsBufferInfos;
+	lightsBufferInfos.buffer = mScene.lights.GetBuffer();;
+	lightsBufferInfos.offset = 0;
+	lightsBufferInfos.range = mScene.lights.GetSize();
+
+	VkWriteDescriptorSet lightsBufferWrite;
+	lightsBufferWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	lightsBufferWrite.pNext = nullptr;
+	lightsBufferWrite.dstSet = mRTDescriptorSets[SWS_LIGHTS_SET];
+	lightsBufferWrite.dstBinding = 0;
+	lightsBufferWrite.dstArrayElement = 0;
+	lightsBufferWrite.descriptorCount = 1;
+	lightsBufferWrite.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	lightsBufferWrite.pImageInfo = nullptr;
+	lightsBufferWrite.pBufferInfo = &lightsBufferInfos;
+	lightsBufferWrite.pTexelBufferView = nullptr;
 	/////////////////////////////////////////////////////////// 
 	VkDescriptorBufferInfo camdataBufferInfo;
 	camdataBufferInfo.buffer = mCameraBuffer.GetBuffer();
@@ -996,7 +1076,8 @@ void RayTracerApp::UpdateDescriptorSets() {
 	camdataBufferWrite.pImageInfo = nullptr;
 	camdataBufferWrite.pBufferInfo = &camdataBufferInfo;
 	camdataBufferWrite.pTexelBufferView = nullptr;
-	/////////////////////////////////////////////////////////// 
+
+	///////////////////////////////////////////////////////////
 	VkDescriptorBufferInfo uniformParamsBufferInfo;
 	uniformParamsBufferInfo.buffer = mUniformParamsBuffer.GetBuffer();
 	uniformParamsBufferInfo.offset = 0;
@@ -1024,6 +1105,8 @@ void RayTracerApp::UpdateDescriptorSets() {
 	   facesBufferWrite,
 	   //
 	   meshInfoBufferWrite,
+	   //
+	   lightsBufferWrite,
 	   //
 	   camdataBufferWrite,
 	   //

@@ -51,6 +51,22 @@ vec3 samplingHemisphere(inout uint seed, in vec3 x, in vec3 y, in vec3 z)
 	return direction;
 }
 
+vec3 randomPointInTriangle(inout uint seed,vec3 A,vec3 B,vec3 C)
+{
+	float r1 = nextRand(seed);
+	float r2 = nextRand(seed);
+
+	if (r1 + r2 > 1.0) {
+		r1 = 1.0 - r1;
+		r2 = 1.0 - r2;
+	}
+
+	float a = 1.0 - r1 - r2;
+	float b = r1;
+	float c = r2;
+
+	return (a * A) + (b * B) + (c * C);
+}
 // Return the tangent and binormal from the incoming normal
 void createCoordinateSystem(in vec3 N, out vec3 Nt, out vec3 Nb)
 {
@@ -83,3 +99,29 @@ vec3 computeSpecular(vec3 viewDir, vec3 lightDir, vec3 normal, vec3 ks, float sh
 	float       specular = pow(VdotR, shininess);
 	return vec3(ks * specular);
 }
+
+// shaders helper functions
+vec2 BaryLerp(vec2 a, vec2 b, vec2 c, vec3 barycentrics) {
+	return a * barycentrics.x + b * barycentrics.y + c * barycentrics.z;
+}
+
+vec3 BaryLerp(vec3 a, vec3 b, vec3 c, vec3 barycentrics) {
+	return a * barycentrics.x + b * barycentrics.y + c * barycentrics.z;
+}
+
+float LinearToSrgb(float channel) {
+	if (channel <= 0.0031308f) {
+		return 12.92f * channel;
+	}
+	else {
+		return 1.055f * pow(channel, 1.0f / 2.4f) - 0.055f;
+	}
+}
+
+vec3 LinearToSrgb(vec3 linear) {
+	return vec3(LinearToSrgb(linear.r), LinearToSrgb(linear.g), LinearToSrgb(linear.b));
+}
+
+
+
+

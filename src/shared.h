@@ -1,13 +1,9 @@
 #ifndef SHARED_H
 #define SHARED_H
 
-#ifdef __cplusplus
-// include vec & mat types (same namings as in GLSL)
-#include "framework/common.h"
-#endif // __cplusplus
-#define MAX_LIGHTS			 	5
-#define MAX_PATH_DEPTH			 	5
-#define MAX_PATH_TRACED			50
+#define MAX_LIGHTS			 	10
+#define MAX_PATH_DEPTH			10
+#define MAX_PATH_TRACED			100
 #define MAX_ANTIALIASING_ITER   5
 //
 #define SWS_PRIMARY_HIT_SHADERS_IDX      0
@@ -35,17 +31,17 @@
 #define SWS_ATTRIBS_SET                 1
 #define SWS_FACES_SET                   2
 #define SWS_MESHINFO_SET                3
+#define SWS_LIGHTS_SET                  4
 
-#define SWS_NUM_SETS                    4
+#define SWS_NUM_SETS                    5
 /////////////////////////////////////////
 // cross-shader locations
 #define SWS_LOC_PRIMARY_RAY             0
 #define SWS_LOC_HIT_ATTRIBS             1
 #define SWS_LOC_SHADOW_RAY              2
 #define SWS_LOC_INDIRECT_RAY            3
-#define SWS_LOC_INDIRECT_RAY2            4
 
-#define SWS_MAX_RECURSION               10
+#define SWS_MAX_RECURSION               5
 //////////////////////////////////////////
 struct RayPayload {
 	uint rndSeed;// used in anyhit
@@ -79,6 +75,11 @@ struct VertexAttribute {
     vec4 normal;
     vec4 uv;
 };
+struct LightTriangle {
+	vec3 v0;
+	vec3 v1;
+	vec3 v2;
+};
 struct ShadingData {
 	vec4 matColor;
 	vec3 emittance;
@@ -100,34 +101,8 @@ struct CameraUniformParams {
 struct UniformParams {
 	vec4 clearColor;
 	// Lighting
-	vec4 LightPos;
 	vec4 LightInfo;
 	vec4 modeFrame;
 };
-
-// shaders helper functions
-vec2 BaryLerp(vec2 a, vec2 b, vec2 c, vec3 barycentrics) {
-    return a * barycentrics.x + b * barycentrics.y + c * barycentrics.z;
-}
-
-vec3 BaryLerp(vec3 a, vec3 b, vec3 c, vec3 barycentrics) {
-    return a * barycentrics.x + b * barycentrics.y + c * barycentrics.z;
-}
-
-float LinearToSrgb(float channel) {
-    if (channel <= 0.0031308f) {
-        return 12.92f * channel;
-    } else {
-        return 1.055f * pow(channel, 1.0f / 2.4f) - 0.055f;
-    }
-}
-
-vec3 LinearToSrgb(vec3 linear) {
-    return vec3(LinearToSrgb(linear.r), LinearToSrgb(linear.g), LinearToSrgb(linear.b));
-}
-
-
-
-
 
 #endif // SHARED_H

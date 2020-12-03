@@ -2,6 +2,7 @@
 
 #include "framework/vulkanapp.h"
 
+#include "shared.h"
 #include "framework/camera.h"
 struct RTAccelerationStructure {
     VkDeviceMemory                          memory;
@@ -23,6 +24,8 @@ struct RTMesh {
 };
 struct RTScene {
 	Array<RTMesh>                   meshes;
+	Array<LightTriangle>            lightsT;
+	vulkanhelpers::Buffer		    lights;
 	RTAccelerationStructure         topLevelAS;
 
 	// shader resources stuff
@@ -76,18 +79,13 @@ class Light
 
 public:
 	float ShadowAttenuation;
-	vec3 lightPos;
 	float LightIntensity;
-	Light() :lightPos(vec3(0.0f, 0.40f, 1.0f)),ShadowAttenuation(0.1), LightIntensity(1.0f)
+	vec3 sunPos;
+	int size;
+	Light() :ShadowAttenuation(0.1), LightIntensity(1.0f), sunPos(0,0.40,1)
 	{
-	}
-	void move(vec3 step)
-	{
-		lightPos = lightPos+step;
-	}
-	vec4 getLightPos()
-	{
-		return vec4(lightPos, LightIntensity);
+
+		size = 0;
 	}
 };
 class RayTracerApp : public VulkanApp {
@@ -98,6 +96,7 @@ public:
 protected:
     virtual void InitSettings() override;
     virtual void InitApp() override;
+	void updateUniformParams(const float deltaTime);
 	void updateUniformParams(const float deltaTime, int frameNumber);
     virtual void FreeResources() override;
     virtual void FillCommandBuffer(VkCommandBuffer commandBuffer, const size_t imageIndex) override;
@@ -111,6 +110,7 @@ private:
                   const VkAccelerationStructureCreateGeometryTypeInfoKHR* geometries,
                   const uint32_t instanceCount,
                   RTAccelerationStructure& _as);
+	void fillLightsBuffer();
 	void LoadSceneGeometry();
 	void LoadObj(String fileName);
 	void CreateCamera();
