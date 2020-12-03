@@ -107,16 +107,17 @@ vec3 pathtracerLoop(vec3 origin,vec3 direction,uint rndSeed)
 	const uint rayFlags = gl_RayFlagsOpaqueEXT;// gl_RayFlagsNoneEXT; 
 
 	const uint cullMask = 0xFF;
-	const uint stbRecordStride = 0;
+	const uint stbRecordStride = 1;
 	const float tmin = 0.001;
 	const float tmax = 10000.0;
 	vec3 hitValues = vec3(0);
+
+	indirectRay.rndSeed = rndSeed;
 	for (int p = 0; p < MAX_PATH_TRACED; p++)
 	{
-		indirectRay.rndSeed = rndSeed;
 		indirectRay.rayOrigin = origin.xyz;
 		indirectRay.rayDir = direction.xyz;
-		indirectRay.weight = vec3(0);
+		indirectRay.weight = vec3(1);
 		indirectRay.rayDepth = 0;
 		indirectRay.hitValue = vec3(0);
 		vec3 curWeight = vec3(1);

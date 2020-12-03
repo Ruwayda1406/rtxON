@@ -357,9 +357,9 @@ void RayTracerApp::LoadSceneGeometry() {
 
 	mScene.meshes.clear(); 
 	mScene.lightsT.clear();
-	LoadObj(sScenesFolder + "test_sphereLight.obj");
+	//LoadObj(sScenesFolder + "test_sphereLight.obj");
 	//LoadObj(sScenesFolder + "test.obj");
-	//LoadObj(sScenesFolder + "test_planeLight.obj");///
+	LoadObj(sScenesFolder + "test_planeLight.obj");///
 	//LoadObj(sScenesFolder + "test2.obj");
 	// prepare shader resources infos
 	fillLightsBuffer();

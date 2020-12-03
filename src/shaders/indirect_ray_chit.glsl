@@ -162,9 +162,9 @@ vec3 shootRay(vec3 rayOrigin, vec3 rayDirection, int depth)
 
 	const uint rayFlags = gl_RayFlagsOpaqueEXT;
 	const uint cullMask = 0xFF;
-	const uint stbRecordStride = 0;
+	const uint stbRecordStride = 1;
 	const float tmin = 0.001;
-	const float tmax = 100000000.0;;
+	const float tmax = 1000000.0;;
 	indirectRay.rayDepth = depth;
 	traceRayEXT(Scene,
 		rayFlags,
@@ -183,11 +183,6 @@ vec3 shootRay(vec3 rayOrigin, vec3 rayDirection, int depth)
 }
 void DiffuseBRDF(ShadingData hit)
 {
-	//if (hit.emittance.x ==1.0)
-	//{
-	//	indirectRay.hitValue = hit.emittance;
-	//	return;
-	//}
 	//https://en.wikipedia.org/wiki/Path_tracing
 	// Pick a random direction from here and keep going.
 	vec3 tangent, bitangent;
@@ -210,7 +205,11 @@ void DiffuseBRDF(ShadingData hit)
 	indirectRay.rayDir = rayDirection;
 	indirectRay.weight = weight;
 	indirectRay.hitValue = hit.emittance;
-
+	if (hit.emittance.x == 1.0)
+	{
+		indirectRay.hitValue = hit.emittance;
+		return;
+	}
 
 	vec3 reflected = vec3(0);
 	// Recursively trace reflected light sources.
@@ -219,7 +218,7 @@ void DiffuseBRDF(ShadingData hit)
 		reflected = shootRay(indirectRay.rayOrigin, indirectRay.rayDir, indirectRay.rayDepth+1);
 	}
 	// Apply the Rendering Equation here.
-	indirectRay.hitValue = hit.emittance + (reflected * weight);
+	indirectRay.hitValue = hit.emittance + (reflected *weight);
 }
 void SpecularBRDF(ShadingData hit)
 {
