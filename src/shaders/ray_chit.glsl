@@ -88,7 +88,8 @@ bool shootShadowRay(vec3 shadowRayOrigin, vec3 dirToLight, float min, float dist
 }
 vec3 getLightPos(int LightType,inout uint seed)
 {
-	if (LightType == 0)//random
+	/*int useSun = int(Params.SunPos.w);
+	if (useSun == 0)//random
 	{
 		int nLightTriangles = int(Params.LightInfo.z);
 		float r0 = nextRand(seed)*nLightTriangles;
@@ -96,10 +97,33 @@ vec3 getLightPos(int LightType,inout uint seed)
 		LightTriangle lightT = lightTriangles[randomTriangleIdx];
 		return randomPointInTriangle(seed, lightT.v0, lightT.v1, lightT.v2);
 	}
+	else*/
+	{
+		if (LightType == 0)
+		{
+			return Params.SunPos.xyz;;
+		}
+		//softshadow
+		else
+		{
+			float r1 = nextRand(seed);
+			float r2 = nextRand(seed);
+			float r3 = nextRand(seed);
+			return Params.SunPos.xyz + vec3(r1, r2, r3);
+		}
+	}
+}
+int getMax(int LightType)
+{
+	if (LightType == 0)
+	{
+		return 1;
+	}
 	else
 	{
-		return lightTriangles[0].v0;
+		return MAX_LIGHTS;
 	}
+
 }
 vec3 DiffuseShade(vec3 HitPosition, vec3 HitNormal, vec3 HitMatColor, float kd, float ks)
 {
@@ -107,25 +131,31 @@ vec3 DiffuseShade(vec3 HitPosition, vec3 HitNormal, vec3 HitMatColor, float kd, 
 	int LightType = int(Params.LightInfo.x);
 	vec3 hitValues = vec3(0);
 
-
-	for (int j = 0; j < MAX_LIGHTS; j++)//SoftShadows
+	int max = getMax(LightType);
+	uint seed = PrimaryRay.rndSeed;
+	for (int j = 0; j < max; j++)
 	{
-		vec3 lightPos = getLightPos(LightType,PrimaryRay.rndSeed);//Params.LightPos.xyz + vec3(r1, r2,r3);
+		vec3 lightPos = getLightPos(LightType, seed);
+		float lightIntensity =1.0;
+		vec3 dirToLight = normalize(lightPos-vec3(0));
+		float distToLight = 10000;
+		//====================================================================
+		/*vec3 lightPos = getLightPos(LightType, indirectRay.rndSeed);//Params.LightPos.xyz + vec3(r1, r2, r3);
+		float lightIntensity = Params.LightInfo.w;
 		vec3 dirToLight;
 		float distToLight;
-		float lightIntensity = Params.LightInfo.w;
-		//if (LightType == 0)// Point light
+		if (LightType == 0)// Point light
 		{
-		//	dirToLight = normalize(lightPos - HitPosition);
-		//	distToLight = length(lightPos - HitPosition);
-			//lightIntensity = lightIntensity / (distToLight * distToLight);
+			dirToLight = normalize(lightPos - HitPosition);
+			distToLight = length(lightPos - HitPosition);
+			lightIntensity = lightIntensity / (distToLight * distToLight);
 		}
 		//else  // Directional light
 		{
-			dirToLight = normalize(lightPos); 
-			distToLight = length(lightPos);
-			//distToLight = 10000;
-		}
+			//dirToLight = normalize(lightPos - vec3(0));
+		//	distToLight = length(lightPos - vec3(0));
+		//	distToLight = 10000;
+		}*/
 		//====================================================================
 		// Diffuse
 		vec3 diffuse = computeDiffuse(dirToLight, HitNormal, vec3(kd), HitMatColor);
@@ -158,7 +188,7 @@ vec3 DiffuseShade(vec3 HitPosition, vec3 HitNormal, vec3 HitMatColor, float kd, 
 		hitValues += vec3(attenuation * lightIntensity * (diffuse + specular));
 	}
 
-	vec3 finalcolor = hitValues / float(MAX_LIGHTS);
+	vec3 finalcolor = hitValues / float(max);
 	return finalcolor;
 }
 void main() {

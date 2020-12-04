@@ -73,7 +73,7 @@ vec3 shootColorRay(vec3 rayOrigin, vec3 rayDirection, float min, float max)
 	return hitValue;
 
 }
-vec3 raytracer(uint rndSeed)
+vec3 raytracer_antialiasing(uint rndSeed)
 {
 
 	// Do diffuse shading at the primary hit
@@ -85,7 +85,7 @@ vec3 raytracer(uint rndSeed)
 		float r2 = nextRand(rndSeed);
 		// Subpixel jitter: send the ray through a different position inside the pixel
 		// each time, to provide antialiasing.
-		const vec2 uv = vec2(gl_LaunchIDEXT.xy) +vec2(r1, r2);
+		const vec2 uv = vec2(gl_LaunchIDEXT.xy) + vec2(r1, r2);
 		const vec2 pixel = uv / (gl_LaunchSizeEXT.xy - 1.0);
 		const float aspect = float(gl_LaunchSizeEXT.x) / float(gl_LaunchSizeEXT.y);
 
@@ -99,7 +99,23 @@ vec3 raytracer(uint rndSeed)
 		rndSeed = PrimaryRay.rndSeed;
 
 	}
-	return ( hitValues / float(MAX_ANTIALIASING_ITER));
+	return (hitValues / float(MAX_ANTIALIASING_ITER));
+}
+vec3 raytracer(uint rndSeed)
+{
+
+	const vec2 uv = vec2(gl_LaunchIDEXT.xy);
+	const vec2 pixel = uv / (gl_LaunchSizeEXT.xy - 1.0);
+	const float aspect = float(gl_LaunchSizeEXT.x) / float(gl_LaunchSizeEXT.y);
+
+	// Initialize a ray structure for our ray tracer
+	vec3 origin = Camera.pos.xyz;
+	vec3 direction = CalcRayDir(pixel, aspect);
+
+	PrimaryRay.rndSeed = rndSeed;
+	vec3 hitValues = shootColorRay(origin, direction, 0.0001, 10000.0);
+
+	return hitValues;
 }
 vec3 pathtracerLoop(vec3 origin,vec3 direction,uint rndSeed)
 {
@@ -197,7 +213,7 @@ void main() {
 	if (mode == 1)
 	{
 		uint rndSeed = tea(gl_LaunchIDEXT.y * gl_LaunchSizeEXT.x + gl_LaunchIDEXT.x, int(frameCount));
-		color = raytracer(rndSeed);
+		color = raytracer_antialiasing(rndSeed);
 		alpha = 0.1;
 
 	}

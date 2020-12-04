@@ -88,7 +88,8 @@ bool shootShadowRay(vec3 shadowRayOrigin, vec3 dirToLight, float min, float dist
 }
 vec3 getLightPos(int LightType, inout uint seed)
 {
-	if (LightType == 0)//random
+	/*int useSun = int(Params.SunPos.w);
+	if (useSun == 0)//random
 	{
 		int nLightTriangles = int(Params.LightInfo.z);
 		float r0 = nextRand(seed)*nLightTriangles;
@@ -96,35 +97,31 @@ vec3 getLightPos(int LightType, inout uint seed)
 		LightTriangle lightT = lightTriangles[randomTriangleIdx];
 		return randomPointInTriangle(seed, lightT.v0, lightT.v1, lightT.v2);
 	}
-	else
+	else*/
 	{
-		return lightTriangles[0].v0;
+		
+		if (LightType == 0)
+			return Params.SunPos.xyz;;
+
+		//softshadow
+		float r1 = nextRand(seed);
+		float r2 = nextRand(seed);
+		float r3 = nextRand(seed);
+		return Params.SunPos.xyz + vec3(r1, r2, r3);
 	}
 }
 vec3 DiffuseShade(vec3 HitPosition, vec3 HitNormal, vec3 HitMatColor, float kd, float ks)
 {
 
-	// Get information about this light; access your framework’s scene structs
 	int LightType = int(Params.LightInfo.x);
+	uint seed = indirectRay.rndSeed;
+	// Get information about this light; access your framework’s scene structs
 	vec3 hitValues = vec3(0);
+	vec3 lightPos = getLightPos(LightType, seed);
+	float lightIntensity = 1.0;
+	vec3 dirToLight = normalize(lightPos - vec3(0));
+	float distToLight = 10000;
 
-	vec3 lightPos = getLightPos(LightType, indirectRay.rndSeed);//Params.LightPos.xyz + vec3(r1, r2, r3);
-	float lightIntensity = Params.LightInfo.w;
-	vec3 dirToLight;
-	float distToLight;
-	//if (LightType == 0)// Point light
-	{
-	//	dirToLight = normalize(lightPos - HitPosition);
-	//	distToLight = length(lightPos - HitPosition);
-	//	lightIntensity = lightIntensity / (distToLight * distToLight);
-	}
-	//else  // Directional light
-	{
-		dirToLight = normalize(lightPos - vec3(0));
-		distToLight = length(lightPos - vec3(0));
-	//	distToLight = 10000;
-	}
-	//====================================================================
 	// Diffuse
 	vec3 diffuse = computeDiffuse(dirToLight, HitNormal, vec3(kd), HitMatColor);
 
@@ -205,7 +202,7 @@ void DiffuseBRDF(ShadingData hit)
 	const float pdf = 1.0 / (2.0*M_PI);
 	// Compute the BRDF for this ray (assuming Lambertian reflection)
 	const vec3 brdf = hit.matColor.xyz * (1.0 /M_PI);
-	vec3 weight = indirectRay.weight;
+	//vec3 weight = indirectRay.weight;
 
 	indirectRay.weight *= (brdf / pdf) * cos_theta;
 	///////////////////////////////////////////////
@@ -238,10 +235,12 @@ void SpecularBRDF(ShadingData hit)
 	float cos_theta = dot(rayDirection, hit.normal);
 	// Probability of the newRay (cosine distributed)
 	const float pdf = 1.0 / (2.0*M_PI);
+	// Compute the BRDF for this ray (assuming Lambertian reflection)
+	const vec3 brdf =  vec3(1.0 / M_PI);
 
 	indirectRay.rayOrigin = rayOrigin;
 	indirectRay.rayDir = rayDirection;
-	indirectRay.weight *= (1.0 / pdf) * cos_theta;
+	indirectRay.weight *= (brdf / pdf) * cos_theta;
 	indirectRay.hitValue = hit.emittance;
 
 	vec3 reflected = vec3(0);
@@ -251,7 +250,7 @@ void SpecularBRDF(ShadingData hit)
 		reflected = shootRay(indirectRay.rayOrigin, indirectRay.rayDir, indirectRay.rayDepth + 1);
 	}
 	// Apply the Rendering Equation here.
-	indirectRay.hitValue = hit.emittance + (reflected *(1.0 / pdf) * cos_theta);
+	indirectRay.hitValue = hit.emittance + (reflected *(brdf / pdf) * cos_theta);
 }
 void main() {
 	indirectRay.isMiss = false;
@@ -275,12 +274,12 @@ void main() {
 			}
 			rrFactor = 1.0 / (1.0 - rrStopProbability);
 		}
-		//if (hit.mat == 3)
+		if (hit.mat == 3)
 		{
 			// Specular BRDF - one incoming direction & one outgoing direction, that is, the perfect reflection direction.
-		//	SpecularBRDF(hit);
+			SpecularBRDF(hit);
 		}
-		//else //if (hit.mat == 0)
+		else //if (hit.mat == 0)
 		{
 			// Diffuse BRDF - choose an outgoing direction with hemisphere sampling.
 			DiffuseBRDF(hit);

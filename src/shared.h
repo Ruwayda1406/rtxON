@@ -101,6 +101,7 @@ struct CameraUniformParams {
 struct UniformParams {
 	vec4 clearColor;
 	// Lighting
+	vec4 SunPos;
 	vec4 LightInfo;
 	vec4 modeFrame;
 };

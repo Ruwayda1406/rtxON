@@ -82,10 +82,16 @@ public:
 	float LightIntensity;
 	vec3 sunPos;
 	int size;
+	int useSun;
 	Light() :ShadowAttenuation(0.1), LightIntensity(1.0f), sunPos(0,0.40,1)
 	{
 
 		size = 0;
+		useSun = 0;
+	}
+	void moveSun(vec3 step)
+	{
+		sunPos += step;
 	}
 };
 class RayTracerApp : public VulkanApp {
@@ -97,7 +103,6 @@ protected:
     virtual void InitSettings() override;
     virtual void InitApp() override;
 	void updateUniformParams(const float deltaTime);
-	void updateUniformParams(const float deltaTime, int frameNumber);
     virtual void FreeResources() override;
     virtual void FillCommandBuffer(VkCommandBuffer commandBuffer, const size_t imageIndex) override;
 	void OnKey(const int key, const int scancode, const int action, const int mods) override;

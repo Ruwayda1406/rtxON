@@ -56,12 +56,12 @@ void RayTracerApp::InitApp() {
 void RayTracerApp::updateUniformParams(const float deltaTime) {
 	int currTime = floor(glfwGetTime() * 100);
 	// update values
-	/*if (mWKeyDown) {
-		mLight.move(vec3(0.01, 0, 0));
+	if (mWKeyDown) {
+		mLight.moveSun(vec3(0.01, 0, 0));
 	}
 	if (mSKeyDown) {
-		mLight.move(vec3(-0.01, 0, 0));
-	}*/
+		mLight.moveSun(vec3(-0.01, 0, 0));
+	}
 	if (mRightKeyDown || mLeftKeyDown || mDownKeyDown || mUpKeyDown){
 		vec2 moveDelta(0.0f, 0.0f);
 		if (mUpKeyDown) {
@@ -96,7 +96,7 @@ void RayTracerApp::updateUniformParams(const float deltaTime) {
 	// copy others data to gpu
 	UniformParams* params = reinterpret_cast<UniformParams*>(mUniformParamsBuffer.Map());
 	params->clearColor = backgroundColor;
-	//params->LightPos = mLight.getLightPos();
+	params->SunPos = vec4(mLight.sunPos, mLight.useSun);
 	params->LightInfo = vec4(lightType, mLight.ShadowAttenuation, mLight.size,mLight.LightIntensity);
 	params->modeFrame= vec4(mode, frameNumber,0.0,0.0);
 	mUniformParamsBuffer.Unmap();
@@ -350,6 +350,8 @@ void RayTracerApp::fillLightsBuffer()
 		light.v2 = mLight.sunPos;
 		mScene.lights.Unmap();
 		mLight.size = 1;
+
+		mLight.useSun = 1;
 	}
 
 }
@@ -357,7 +359,6 @@ void RayTracerApp::LoadSceneGeometry() {
 
 	mScene.meshes.clear(); 
 	mScene.lightsT.clear();
-	//LoadObj(sScenesFolder + "test_sphereLight.obj");
 	//LoadObj(sScenesFolder + "test.obj");
 	LoadObj(sScenesFolder + "test_planeLight.obj");///
 	//LoadObj(sScenesFolder + "test2.obj");
@@ -1047,6 +1048,7 @@ void RayTracerApp::UpdateDescriptorSets() {
 	lightsBufferInfos.buffer = mScene.lights.GetBuffer();;
 	lightsBufferInfos.offset = 0;
 	lightsBufferInfos.range = mScene.lights.GetSize();
+
 
 	VkWriteDescriptorSet lightsBufferWrite;
 	lightsBufferWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
